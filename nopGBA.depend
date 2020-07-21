@@ -1,0 +1,11 @@
+# depslib dependency file v1.0
+1594572888 source:/home/zach/codeblocks/nopGBA/main.cpp
+	"cpu.hpp"
+
+1595361176 /home/zach/codeblocks/nopGBA/cpu.hpp
+	"include.hpp"
+
+1594575753 /home/zach/codeblocks/nopGBA/include.hpp
+	<iostream>
+	<bitset>
+
