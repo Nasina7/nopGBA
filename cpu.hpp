@@ -78,6 +78,72 @@ void movOP() // 001-1101
     }
     gbaREG.rNUM[15] += 4;
 }
+uint8_t regToWriteCPSR;
+std::bitset<32> valToWriteCPSR;
+std::bitset<4> BB4MSR; // Used to get REG Number and to get Field Mask
+std::bitset<1> r22;
+void msrREGOP()
+{
+    BB4MSR = currentOpcode;
+    regToWriteCPSR = BB4MSR.to_ulong();
+    valToWriteCPSR = gbaREG.rNUM[regToWriteCPSR];
+    printf("Note, does SBO or SBZ do anything?");
+    BB4MSR = currentOpcode >> 16;
+    r22 = currentOpcode >> 22;
+    if(r22[0] == 0)
+    {
+        if(BB4MSR[0] == 1)
+        {
+            gbaREG.cpsr[0] = valToWriteCPSR[0];
+            gbaREG.cpsr[1] = valToWriteCPSR[1];
+            gbaREG.cpsr[2] = valToWriteCPSR[2];
+            gbaREG.cpsr[3] = valToWriteCPSR[3];
+            gbaREG.cpsr[4] = valToWriteCPSR[4];
+            gbaREG.cpsr[5] = valToWriteCPSR[5];
+            gbaREG.cpsr[6] = valToWriteCPSR[6];
+            gbaREG.cpsr[7] = valToWriteCPSR[7];
+        }
+        if(BB4MSR[1] == 1)
+        {
+            gbaREG.cpsr[8] = valToWriteCPSR[8];
+            gbaREG.cpsr[9] = valToWriteCPSR[9];
+            gbaREG.cpsr[10] = valToWriteCPSR[10];
+            gbaREG.cpsr[11] = valToWriteCPSR[11];
+            gbaREG.cpsr[12] = valToWriteCPSR[12];
+            gbaREG.cpsr[13] = valToWriteCPSR[13];
+            gbaREG.cpsr[14] = valToWriteCPSR[14];
+            gbaREG.cpsr[15] = valToWriteCPSR[15];
+        }
+        if(BB4MSR[2] == 1)
+        {
+            gbaREG.cpsr[16] = valToWriteCPSR[16];
+            gbaREG.cpsr[17] = valToWriteCPSR[17];
+            gbaREG.cpsr[18] = valToWriteCPSR[18];
+            gbaREG.cpsr[19] = valToWriteCPSR[19];
+            gbaREG.cpsr[20] = valToWriteCPSR[20];
+            gbaREG.cpsr[21] = valToWriteCPSR[21];
+            gbaREG.cpsr[22] = valToWriteCPSR[22];
+            gbaREG.cpsr[23] = valToWriteCPSR[23];
+        }
+        if(BB4MSR[3] == 1)
+        {
+            gbaREG.cpsr[24] = valToWriteCPSR[24];
+            gbaREG.cpsr[25] = valToWriteCPSR[25];
+            gbaREG.cpsr[26] = valToWriteCPSR[26];
+            gbaREG.cpsr[27] = valToWriteCPSR[27];
+            gbaREG.cpsr[28] = valToWriteCPSR[28];
+            gbaREG.cpsr[29] = valToWriteCPSR[29];
+            gbaREG.cpsr[30] = valToWriteCPSR[30];
+            gbaREG.cpsr[31] = valToWriteCPSR[31];
+        }
+    }
+    if(r22[0] == 1)
+    {
+        printf("HAVENT ADDED SPSR TO MSRREGOP see pg 163 of datasheetsarmpdf\n");
+        opcodeError = true;
+    }
+    gbaREG.rNUM[15] += 4;
+}
 void loadStoreOp()
 {
     printf("LOAD OR STORE!\n");
@@ -117,10 +183,13 @@ void loadStoreOp()
     {
         writeMem(0,lsAddr,gbaREG.rNUM[RdLS]);
     }
-    if(loadStore == 1)
+    if(byteWordLS == 0 && loadStore == 1)
     {
-        opcodeError = true;
-        printf("load Not implemented.\n");
+        gbaREG.rNUM[RdLS] = readMem(2,lsAddr);
+    }
+    if(byteWordLS == 1 && loadStore == 1)
+    {
+        gbaREG.rNUM[RdLS] = readMem(0,lsAddr);
     }
     gbaREG.rNUM[15] += 4;
 }
@@ -156,14 +225,40 @@ void dataProcessingORpsrTransfer(uint32_t opcode)
 {
     opcode001 = opcode >> 21;
     opcode0018B = opcode001.to_ulong();
+    currentOpcodeBit = opcode >> 25;
     switch(opcode0018B) // XXXX001????
     {
+        case 0x9:
+            currentOpcodeBit = opcode >> 20;
+            if(currentOpcodeBit[0] == 0)
+            {
+                msrREGOP();
+            }
+            if(currentOpcodeBit[0] == 1)
+            {
+                printf("TEQ NOT IMPLEMENTED!\n");
+                opcodeError = true;
+            }
+        break;
+
         case 0xD:
-            movOP();
+            currentOpcodeBit = opcode >> 25;
+            if(currentOpcodeBit[0] == 1)
+            {
+                movOP();
+            }
+            if(currentOpcodeBit[0] == 0)
+            {
+                printf("UNIMPLEMENTED TYPE OF MOVE!\n");
+                opcodeError = true;
+            }
         break;
 
         default:
-            printf("UNIMPLEMENTED OP XXXX00? then 0x%X!\n",opcode0018B);
+            printf("UNIMPLEMENTED OP XXXX00");
+            currentOpcodeBit = opcode >> 25;
+            std::cout<<currentOpcodeBit;
+            printf(" then 0x%X!\n",opcode0018B);
             std::cout<<"Opcode: "<<bitOpcode<<std::endl;
             opcodeError = true;
         break;
