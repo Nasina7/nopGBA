@@ -1,4 +1,4 @@
-#include "include.hpp"
+#include "cpuTHUMB.hpp"
 /*
 XXXX001XXXXXXXXXXXXXXXXXXXXXXXXX Data Processing
 XXXX000000??XXXXXXXXXXXX1001XXXX Multiply
@@ -39,7 +39,59 @@ void loadROM()
     fread(gbaRAM.flashROM,romSize,1,rom);
     fclose(rom);
 }
-//          001 Data Opcodes
+std::bitset<32> B32ImmedGet;
+std::bitset<8> immed8;
+std::bitset<4> rotate_imm;
+uint8_t rotateImmMult2;
+uint32_t get32Bimmediate()
+{
+    immed8 = currentOpcode;
+    B32ImmedGet = immed8.to_ulong();
+    rotate_imm = currentOpcode >> 8;
+    rotateImmMult2 = ((rotate_imm.to_ulong()) * 2);
+    while(rotateImmMult2 != 0)
+    {
+        immed8[0] = B32ImmedGet[0];
+        B32ImmedGet = B32ImmedGet >> 1;
+        B32ImmedGet[32] = immed8[0];
+        rotateImmMult2--;
+    }
+    return B32ImmedGet.to_ulong();
+}
+void addOP()
+{
+    opRDET = currentOpcode >> 12;
+    opRD = opRDET.to_ulong();
+    opRDET = currentOpcode >> 16;
+    opRN = opRDET.to_ulong();
+    printf("OPRN: 0x%X\n",opRN);
+    opRDET = currentOpcode >> 20;
+    doFlagUpdate = opRDET[0];
+    opRDET = currentOpcode >> 25;
+    B25ShifterDet = opRDET[0];
+    switch(B25ShifterDet)
+    {
+        case 0:
+            printf("Unimplemented Shifter opernand B25: 0\n");
+            opcodeError = true;
+        break;
+
+        case 1:
+            shifterResult = get32Bimmediate();
+        break;
+    }
+    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] + shifterResult;
+    if(opRN == 0xF)
+    {
+        gbaREG.rNUM[opRD] += 8;
+    }
+    if(doFlagUpdate == true)
+    {
+        printf("Flag Update NOT implemented yet!\n");
+    }
+    //std::cout<<"B25: "<<opRDET[0]<<std::endl;
+    gbaREG.rNUM[15] += 4;
+}
 uint8_t op001code;
 std::bitset<32> rotation8mov;
 std::bitset<4> rotatebitAmount;
@@ -47,7 +99,7 @@ bool rotation8back;
 uint8_t rotationMovAmount;
 uint8_t rMovAmBack;
 uint8_t movIntoReg;
-void movOP() // 001-1101
+void movOP()
 {
     //opcodeError = true;
     rotation8mov = currentOpcode << 24;
@@ -75,6 +127,27 @@ void movOP() // 001-1101
     {
         printf("Does Carry 001-1101 Work?\n");
         gbaREG.cpsr[29] = rotation8mov[31];
+    }
+    gbaREG.rNUM[15] += 4;
+}
+void movOPREG()
+{
+    opRDET = currentOpcode;
+    opRN = opRDET.to_ulong();
+    opRDET = currentOpcode >> 12;
+    opRD = opRDET.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN];
+    if(opRN == 0xF)
+    {
+        gbaREG.rNUM[opRD] += 8;
+    }
+    op32bit = currentOpcode;
+    if(op32bit[20] == 1)
+    {
+        handleSignFlag(gbaREG.rNUM[opRD]);
+        handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
+        handleCarryFlag(0,0,1,0);
     }
     gbaREG.rNUM[15] += 4;
 }
@@ -161,10 +234,18 @@ void loadStoreOp()
         if(lsAddBit3[23] == 1)
         {
             lsAddr += gbaREG.rNUM[RnLS];
+            if(RnLS == 0xF)
+            {
+                lsAddr += 8;
+            }
         }
         if(lsAddBit3[23] == 0)
         {
             lsAddr -= gbaREG.rNUM[RnLS];
+            if(RnLS == 0xF)
+            {
+                lsAddr -= 8;
+            }
         }
     }
     if(PWLSMode != 0x02)
@@ -197,6 +278,7 @@ bool linkBranch;
 int32_t branchOffset;
 void branchOp() // 0x5
 {
+
     op32bit = currentOpcode;
     linkBranch = op32bit[24];
     if(linkBranch == true)
@@ -216,11 +298,22 @@ void branchOp() // 0x5
     gbaREG.rNUM[15] += branchOffset + 8;
     //printf("PC: 0x%02X\n",gbaREG.rNUM[15]);
 }
+std::bitset<32> bAndEJump;
+void branchAndExchangeOp()
+{
+    opRDET = currentOpcode;
+    opRN = opRDET.to_ulong();
+    bAndEJump = gbaREG.rNUM[opRN];
+    gbaREG.cpsr[5] = bAndEJump[0];
+    bAndEJump[0] = 0;
+    gbaREG.rNUM[15] = bAndEJump.to_ulong();
+}
 std::bitset<32> bitOpcode;
 std::bitset<1> currentOpcodeBit;
 std::bitset<4> opcode001;
 std::bitset<4> check11to8;
 uint8_t opcode0018B;
+std::bitset<5> B7tB11;
 void dataProcessingORpsrTransfer(uint32_t opcode)
 {
     opcode001 = opcode >> 21;
@@ -228,6 +321,10 @@ void dataProcessingORpsrTransfer(uint32_t opcode)
     currentOpcodeBit = opcode >> 25;
     switch(opcode0018B) // XXXX001????
     {
+        case 0x4:
+            addOP();
+        break;
+
         case 0x9:
             currentOpcodeBit = opcode >> 20;
             if(currentOpcodeBit[0] == 0)
@@ -249,8 +346,28 @@ void dataProcessingORpsrTransfer(uint32_t opcode)
             }
             if(currentOpcodeBit[0] == 0)
             {
-                printf("UNIMPLEMENTED TYPE OF MOVE!\n");
-                opcodeError = true;
+                std::bitset<3> bit27t25;
+                bit27t25 = currentOpcode >> 4;
+                uint8_t checkModeMov = bit27t25.to_ulong();
+                switch(checkModeMov)
+                {
+                    case 0:
+                        B7tB11 = currentOpcode >> 7;
+                        if(B7tB11.to_ulong() == 0)
+                        {
+                            movOPREG();
+                        }
+                        if(B7tB11.to_ulong() != 0)
+                        {
+                            printf("UNIMPLEMENTED TYPE OF MOVE!\n");
+                        }
+                    break;
+
+                    default:
+                        printf("UNIMPLEMENTED TYPE OF MOVE!\n");
+                        opcodeError = true;
+                    break;
+                }
             }
         break;
 
@@ -297,10 +414,8 @@ void findAndDoOpcode(uint32_t opcode)
                                             check11to8 = opcode >> 8;
                                             switch(check11to8.to_ulong())
                                             {
-                                                case 0xF:
-                                                    printf("UNIMPLEMENTED OP XXXX000 B7 = 0 & B4 = 1 & B8-11 = 1!\n");
-                                                    std::cout<<"Opcode: "<<bitOpcode<<std::endl;
-                                                    opcodeError = true;
+                                                case 0xF: // Branch and Exchange
+                                                    branchAndExchangeOp();
                                                 break;
 
                                                 default:
@@ -411,4 +526,3 @@ int doOpcode(uint32_t opcode)
         break;
     }
 }
-

@@ -33,6 +33,7 @@
 			<Add option="-fexceptions" />
 		</Compiler>
 		<Unit filename="cpu.hpp" />
+		<Unit filename="cpuTHUMB.hpp" />
 		<Unit filename="include.hpp" />
 		<Unit filename="main.cpp" />
 		<Extensions>
