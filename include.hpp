@@ -1,5 +1,9 @@
 #include <iostream>
 #include <bitset>
+#include <SDL2/SDL.h>
+SDL_Window* mainScreen;
+SDL_Renderer* mainRenderer;
+std::bitset<10> joypadReg = 0xFFF;
 class nGBARAM
 {
     public:
@@ -27,6 +31,9 @@ class nGBACPU
         uint32_t rNUM[16];
         std::bitset<32> cpsr;
         std::bitset<32> spsr;
+        uint64_t gbaCycles;
+        uint8_t gbaScanline;
+        uint16_t lcdControl;
 };
 bool breakpoint;
 uint32_t currentOpcode;
@@ -54,12 +61,106 @@ void printRegs()
     }
     std::cout<<"CPSR: "<<gbaREG.cpsr<<std::endl;
 }
+void memDump()
+{
+    FILE* memdump1 = fopen("memdump/biosRAM.nGBA","w+");
+    fwrite(gbaRAM.biosRAM,sizeof(uint8_t),sizeof(gbaRAM.biosRAM),memdump1);
+    memdump1 = fopen("memdump/onBoardWRAM.nGBA","w+");
+    fwrite(gbaRAM.onBoardWRAM,sizeof(uint8_t),sizeof(gbaRAM.onBoardWRAM),memdump1);
+    memdump1 = fopen("memdump/onChipWRAM.nGBA","w+");
+    fwrite(gbaRAM.onChipWRAM,sizeof(uint8_t),sizeof(gbaRAM.onChipWRAM),memdump1);
+    memdump1 = fopen("memdump/bg_objPalRAM.nGBA","w+");
+    fwrite(gbaRAM.Bg_ObjPalRam,sizeof(uint8_t),sizeof(gbaRAM.Bg_ObjPalRam),memdump1);
+    memdump1 = fopen("memdump/videoRAM.nGBA","w+");
+    fwrite(gbaRAM.VideoRAM,sizeof(uint8_t),sizeof(gbaRAM.VideoRAM),memdump1);
+    memdump1 = fopen("memdump/objectRAM.nGBA","w+");
+    fwrite(gbaRAM.ObjectRAM,sizeof(uint8_t),sizeof(gbaRAM.ObjectRAM),memdump1);
+    memdump1 = fopen("memdump/saveRAM.nGBA","w+");
+    fwrite(gbaRAM.SaveRAM,sizeof(uint8_t),sizeof(gbaRAM.SaveRAM),memdump1);
+    fclose(memdump1);
+}
+std::bitset<1> backupBit2;
+std::bitset<32> rotateValNeed;
+uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
+{
+    rotateValNeed = valueNeed;
+    if(goRight == true)
+    {
+        if(rotateTimes == 0)
+        {
+            return rotateValNeed.to_ulong();
+        }
+        while(rotateTimes != 0xFF)
+        {
+            backupBit2[0] = rotateValNeed[0];
+            rotateValNeed = rotateValNeed >> 1;
+            rotateValNeed[31] = backupBit2[0];
+            rotateTimes--;
+        }
+    }
+    if(goRight == false)
+    {
+        if(rotateTimes == 0)
+        {
+            return rotateValNeed.to_ulong();
+        }
+        while(rotateTimes != 0xFF)
+        {
+            backupBit2[0] = rotateValNeed[31];
+            rotateValNeed = rotateValNeed << 1;
+            rotateValNeed[0] = backupBit2[0];
+            rotateTimes--;
+        }
+    }
+    return rotateValNeed.to_ulong();
+}
+
+// From CPU.hpp
+uint8_t opRD;
+uint8_t opRN;
+uint8_t opRS;
+uint8_t opRB;
+uint8_t opRM;
+bool doFlagUpdate;
+bool B25ShifterDet;
+std::bitset<4> opRDET;
+uint32_t shifterResult;
+bool pBit;
+bool uBit;
+bool wBit;
+bool lBit;
+bool iBit;
+bool bBit;
+bool sBit;
+// END
+uint32_t endRotate;
+uint8_t shiftIMM;
+std::bitset<5> shiftIMM2;
+uint32_t getLSLbyIMM()
+{
+    opRDET = currentOpcode;
+    opRM = opRDET.to_ulong();
+    shiftIMM2 = currentOpcode >> 7;
+    shiftIMM = shiftIMM2.to_ulong();
+    endRotate = gbaREG.rNUM[opRM] << shiftIMM;
+    return endRotate;
+}
+uint32_t getRRbyIMM()
+{
+    opRDET = currentOpcode;
+    opRM = opRDET.to_ulong();
+    shiftIMM2 = currentOpcode >> 7;
+    shiftIMM = shiftIMM2.to_ulong();
+    endRotate = rotateValue32(true,shiftIMM,gbaREG.rNUM[opRM]);
+    return endRotate;
+}
 uint16_t return16;
 uint32_t return32;
 uint8_t fix1;
 uint8_t fix2;
 uint8_t fix3;
 uint8_t fix4;
+uint8_t randoRet0404;
 uint32_t readMem(int readMode, int location)
 {
     switch(location)
@@ -154,8 +255,24 @@ uint32_t readMem(int readMode, int location)
     break;
 
     case 0x04000000 ... 0x040003FE:
-        printf("IO REG NOT IMPLEMENTED YET! READ!");
-        return 0;
+        switch(location)
+        {
+            case 0x04000004:
+                randoRet0404++;
+                randoRet0404 = randoRet0404 % 2;
+                return randoRet0404;
+            break;
+
+            case 0x04000130:
+                joypadReg.flip(7);
+                return joypadReg.to_ulong();
+            break;
+
+            default:
+                printf("IO REG NOT IMPLEMENTED YET! READ 0x%X\n!",location);
+                return 0;
+            break;
+        }
     break;
 
     case 0x05000000 ... 0x050003FF:
@@ -367,7 +484,103 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
         break;
 
         case 0x04000000 ... 0x040003FE:
-            printf("THIS IS IO REG STUB WRITE!\n");
+            switch(location)
+            {
+                case 0x04000000:
+                    gbaREG.lcdControl = value;
+                break;
+
+                default:
+                    printf("THIS IS IO REG STUB WRITE!\n");
+                break;
+            }
+        break;
+
+        case 0x05000000 ... 0x050003FF:
+            location -= 0x05000000;
+            if(writeMode == 0)
+            {
+                gbaRAM.Bg_ObjPalRam[location] = value;
+            }
+            if(writeMode == 1)
+            {
+                fix1 = value >> 8;
+                fix2 = value;
+                gbaRAM.Bg_ObjPalRam[location + 1] = fix1;
+                gbaRAM.Bg_ObjPalRam[location] = fix2;
+            }
+            if(writeMode == 2)
+            {
+                fix1 = value >> 24;
+                fix2 = value >> 16;
+                fix3 = value >> 8;
+                fix4 = value;
+                gbaRAM.Bg_ObjPalRam[location + 3] = fix1;
+                gbaRAM.Bg_ObjPalRam[location + 2] = fix2;
+                gbaRAM.Bg_ObjPalRam[location + 1] = fix3;
+                gbaRAM.Bg_ObjPalRam[location] = fix4;
+            }
+        break;
+
+        case 0x06000000 ... 0x06017FFF:
+            if(value != 0)
+            {
+                printf("VWRITE!\n");
+            }
+            location -= 0x06000000;
+            if(writeMode == 0)
+            {
+                gbaRAM.VideoRAM[location] = value;
+            }
+            if(writeMode == 1)
+            {
+                fix1 = value >> 8;
+                fix2 = value;
+                gbaRAM.VideoRAM[location + 1] = fix1;
+                gbaRAM.VideoRAM[location] = fix2;
+            }
+            if(writeMode == 2)
+            {
+                fix1 = value >> 24;
+                fix2 = value >> 16;
+                fix3 = value >> 8;
+                fix4 = value;
+                gbaRAM.VideoRAM[location + 3] = fix1;
+                gbaRAM.VideoRAM[location + 2] = fix2;
+                gbaRAM.VideoRAM[location + 1] = fix3;
+                gbaRAM.VideoRAM[location] = fix4;
+            }
+        break;
+
+        case 0x07000000 ... 0x070003FF:
+            location -= 0x07000000;
+            if(writeMode == 0)
+            {
+                gbaRAM.ObjectRAM[location] = value;
+            }
+            if(writeMode == 1)
+            {
+                fix1 = value >> 8;
+                fix2 = value;
+                gbaRAM.ObjectRAM[location + 1] = fix1;
+                gbaRAM.ObjectRAM[location] = fix2;
+            }
+            if(writeMode == 2)
+            {
+                fix1 = value >> 24;
+                fix2 = value >> 16;
+                fix3 = value >> 8;
+                fix4 = value;
+                gbaRAM.ObjectRAM[location + 3] = fix1;
+                gbaRAM.ObjectRAM[location + 2] = fix2;
+                gbaRAM.ObjectRAM[location + 1] = fix3;
+                gbaRAM.ObjectRAM[location] = fix4;
+            }
+        break;
+
+        case 0x08000000 ... 0x0DFFFFFF:
+            printf("WRITE TO ROM!  THIS SHOULDN'T HAPPEN!\n");
+            breakpoint = true;
         break;
 
         default:

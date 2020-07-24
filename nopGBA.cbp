@@ -32,10 +32,14 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 		</Compiler>
+		<Linker>
+			<Add option="-lSDL2" />
+		</Linker>
 		<Unit filename="cpu.hpp" />
 		<Unit filename="cpuTHUMB.hpp" />
 		<Unit filename="include.hpp" />
 		<Unit filename="main.cpp" />
+		<Unit filename="rendering.hpp" />
 		<Extensions>
 			<envvars />
 			<code_completion />

@@ -1,4 +1,4 @@
-#include "include.hpp"
+#include "rendering.hpp"
 void handleZeroFlag(uint32_t original, uint32_t result)
 {
     gbaREG.cpsr[30] = 0;
@@ -40,7 +40,7 @@ void handleCarryFlag(uint32_t original, uint32_t result, uint8_t operation, uint
         case 2:
             gbaREG.cpsr[29] = 0;
             result64 = original + valueUsed;
-            if(result64 > 0xFFFFFFFF)
+            if(result64 != result)
             {
                 gbaREG.cpsr[29] = 1;
             }
@@ -49,7 +49,7 @@ void handleCarryFlag(uint32_t original, uint32_t result, uint8_t operation, uint
         case 3:
             gbaREG.cpsr[29] = 0;
             result64 = original - valueUsed;
-            if(result64 > 0xFFFFFFFF)
+            if(result64 != result)
             {
                 gbaREG.cpsr[29] = 1;
             }
@@ -61,15 +61,6 @@ void handleCarryFlag(uint32_t original, uint32_t result, uint8_t operation, uint
         break;
     }
 }
-// From CPU.hpp
-uint8_t opRD;
-uint8_t opRN;
-uint8_t opRS;
-uint8_t opRB;
-bool doFlagUpdate;
-bool B25ShifterDet;
-std::bitset<4> opRDET;
-uint32_t shifterResult;
 // From this file
 std::bitset<8> word8IMM;
 std::bitset<16> word8IMM2;
@@ -161,6 +152,31 @@ void thumbConditionalBranch()
                 doConditionBranch();
             }
             if(gbaREG.cpsr[29] == 0)
+            {
+                gbaREG.rNUM[15] += 2;
+            }
+        break;
+
+        case 0x9:
+            if(gbaREG.cpsr[29] == 0 || gbaREG.cpsr[30] == 1)
+            {
+                doConditionBranch();
+                break;
+            }
+            gbaREG.rNUM[15] += 2;
+        break;
+
+        case 0xA:
+            printf("WARN!\n");
+            if(gbaREG.cpsr[29] == 1 && gbaREG.cpsr[28] == 1)
+            {
+                doConditionBranch();
+            }
+            if(gbaREG.cpsr[29] == 0 && gbaREG.cpsr[28] == 0)
+            {
+                doConditionBranch();
+            }
+            if(gbaREG.cpsr[29] != gbaREG.cpsr[28])
             {
                 gbaREG.rNUM[15] += 2;
             }
@@ -401,13 +417,18 @@ void thumbOP001strORldr()
     opRB = opRDET3B.to_ulong();
     offset5 = currentThumbOpcode >> 6;
     op16bit = currentThumbOpcode;
+    //if(op16bit[12] == 0)
+    //{
+    //    printf("NOTE!  THIS IS POTENTIALLY INCORRECT IN 001LDRSTRTHUMB\n");
+    //    offset5[1] = 0;
+    //    offset5[0] = 0;
+    //}
+    offset5u = offset5.to_ulong();
     if(op16bit[12] == 0)
     {
         printf("NOTE!  THIS IS POTENTIALLY INCORRECT IN 001LDRSTRTHUMB\n");
-        offset5[1] = 0;
-        offset5[0] = 0;
+        offset5u = offset5u << 2;
     }
-    offset5u = offset5.to_ulong();
     addValforSTRorLDR = gbaREG.rNUM[opRB] + offset5u;
     if(op16bit[12] == 0 && op16bit[11] == 0)
     {
@@ -528,6 +549,172 @@ void thumbOPMoveHI()
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS];
     gbaREG.rNUM[15] += 2;
 }
+uint32_t cmpResultThumb;
+void thumbOP010000CMP()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    cmpResultThumb = gbaREG.rNUM[opRD] - gbaREG.rNUM[opRS];
+    handleSignFlag(cmpResultThumb);
+    handleZeroFlag(gbaREG.rNUM[opRD],cmpResultThumb);
+    handleCarryFlag(gbaREG.rNUM[opRD],cmpResultThumb,3,gbaREG.rNUM[opRS]);
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOP010000CMN()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    cmpResultThumb = gbaREG.rNUM[opRD] + gbaREG.rNUM[opRS];
+    handleSignFlag(cmpResultThumb);
+    handleZeroFlag(gbaREG.rNUM[opRD],cmpResultThumb);
+    handleCarryFlag(gbaREG.rNUM[opRD],cmpResultThumb,2,gbaREG.rNUM[opRS]);
+    gbaREG.rNUM[15] += 2;
+}
+bool signVal;
+uint16_t addValforStack;
+std::bitset<7> getSWord7;
+void thumbOPAddToStackPointer()
+{
+    getSWord7 = currentThumbOpcode;
+    addValforStack = getSWord7.to_ulong();
+    addValforStack = addValforStack << 2;
+    getSWord7 = currentThumbOpcode >> 7;
+    signVal = getSWord7[0];
+    if(signVal == 1)
+    {
+        gbaREG.rNUM[13] -= addValforStack;
+    }
+    if(signVal == 0)
+    {
+        gbaREG.rNUM[13] += addValforStack;
+    }
+    gbaREG.rNUM[15] += 2;
+}
+uint32_t storeLocationOpHalfwordThumb;
+void thumbOPLoadStoreHalfword()
+{
+    offset5 = currentThumbOpcode >> 6;
+    offset5u = offset5.to_ulong();
+    offset5u = offset5u << 1;
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRB = opRDET3B.to_ulong();
+    storeLocationOpHalfwordThumb = gbaREG.rNUM[opRB] + offset5u;
+    op16bit = currentThumbOpcode;
+    lBit = op16bit[11];
+    if(lBit == 1)
+    {
+        gbaREG.rNUM[opRD] = readMem(1,storeLocationOpHalfwordThumb);
+    }
+    if(lBit == 0)
+    {
+        writeMem(1,storeLocationOpHalfwordThumb,gbaREG.rNUM[opRD]);
+    }
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOPNeg()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = 0 - gbaREG.rNUM[opRS];
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    handleCarryFlag(0,0,1,0);
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOPAND()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] & gbaREG.rNUM[opRS];
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    handleCarryFlag(0,0,1,0);
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOPOR()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] | gbaREG.rNUM[opRS];
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    handleCarryFlag(0,0,1,0);
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOPEOR()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] ^ gbaREG.rNUM[opRS];
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    handleCarryFlag(0,0,1,0);
+    gbaREG.rNUM[15] += 2;
+}
+std::bitset<8> word8;
+uint16_t word8u;
+uint32_t SPrelLoadStoreLocate;
+void thumbOPSPrelLoadStore()
+{
+    word8 = currentThumbOpcode;
+    word8u = word8.to_ulong();
+    word8u = word8u << 2;
+    opRDET3B = currentThumbOpcode >> 8;
+    opRD = opRDET3B.to_ulong();
+    op16bit = currentThumbOpcode;
+    SPrelLoadStoreLocate = gbaREG.rNUM[13] + word8u;
+    if(op16bit[11] == 1)
+    {
+        gbaREG.rNUM[opRD] = readMem(2,SPrelLoadStoreLocate);
+    }
+    if(op16bit[11] == 0)
+    {
+        writeMem(2,SPrelLoadStoreLocate,gbaREG.rNUM[opRD]);
+    }
+    gbaREG.rNUM[15] += 2;
+}
+uint32_t fixPC1;
+std::bitset<32> fixPC2;
+void thumbOPloadAddress()
+{
+    word8 = currentThumbOpcode;
+    word8u = word8.to_ulong();
+    word8u = word8u << 2;
+    opRDET3B = currentThumbOpcode >> 8;
+    opRD = opRDET3B.to_ulong();
+    op16bit = currentThumbOpcode;
+    if(op16bit[11] == 0)
+    {
+        fixPC2 = gbaREG.rNUM[15] + 4;
+        fixPC2[1] = 0;
+        fixPC1 = fixPC2.to_ulong();
+        SPrelLoadStoreLocate = fixPC1 + word8u;
+    }
+    if(op16bit[11] == 1)
+    {
+        SPrelLoadStoreLocate = gbaREG.rNUM[13] + word8u;
+    }
+    gbaREG.rNUM[opRD] = SPrelLoadStoreLocate;
+    gbaREG.rNUM[15] += 2;
+}
 std::bitset<2> op000Thumb;
 std::bitset<4> op01000Thumb;
 uint8_t op000Thumbu;
@@ -618,12 +805,38 @@ void doThumbOpcode(uint16_t opcode)
                                                     op01000Thumbu = op01000Thumb.to_ulong();
                                                     switch(op01000Thumbu)
                                                     {
+
+                                                        case 0x0:
+                                                            thumbOPAND();
+                                                        break;
+
+                                                        case 0x1:
+                                                            thumbOPEOR();
+                                                        break;
+
+                                                        case 0x9:
+                                                            thumbOPNeg();
+                                                            //breakpoint = true;
+                                                        break;
+
+                                                        case 0xA:
+                                                            thumbOP010000CMP();
+                                                        break;
+
+                                                        case 0xB:
+                                                            thumbOP010000CMN();
+                                                        break;
+
+                                                        case 0xC:
+                                                            thumbOPOR();
+                                                        break;
+
                                                         case 0xE:
                                                             thumbOPBIC();
                                                         break;
 
                                                         default:
-                                                            printf("UNIMPLEMENTED 010000 THUMB OPCODE!\n");
+                                                            printf("UNIMPLEMENTED 010000 THUMB OPCODE 0x%X!\n",op01000Thumbu);
                                                             opcodeError = true;
                                                         break;
                                                     }
@@ -679,24 +892,30 @@ void doThumbOpcode(uint16_t opcode)
                     switch(op16bit[13])
                     {
                         case 0: // 100
-                            printf("Unimplemented Thumb Instruction 100END!\n");
-                            opcodeError = true;
+                            switch(op16bit[12])
+                            {
+                                case 0: // 1000
+                                    thumbOPLoadStoreHalfword();
+                                break;
+
+                                case 1: // 1001
+                                    thumbOPSPrelLoadStore();
+                                break;
+                            }
                         break;
 
                         case 1: // 101
                             switch(op16bit[12])
                             {
                                 case 0: // 1010
-                                    printf("Unimplemented Thumb Instruction 1010END!\n");
-                                    opcodeError = true;
+                                    thumbOPloadAddress();
                                 break;
 
                                 case 1: // 1011
                                     switch(op16bit[10])
                                     {
                                         case 0: // 1011X0
-                                            printf("Unimplemented Thumb Instruction 1011X0END!\n");
-                                            opcodeError = true;
+                                            thumbOPAddToStackPointer();
                                         break;
 
                                         case 1: // 1011X1
