@@ -1,9 +1,11 @@
 #include <iostream>
 #include <bitset>
 #include <SDL2/SDL.h>
+#include <bits/stdc++.h>
 SDL_Window* mainScreen;
 SDL_Renderer* mainRenderer;
-std::bitset<10> joypadReg = 0xFFF;
+SDL_Event SDL_EVENT_HANDLING;
+std::bitset<10> controlBuffer = 0x3FF;
 class nGBARAM
 {
     public:
@@ -30,10 +32,22 @@ class nGBACPU
     public:
         uint32_t rNUM[16];
         std::bitset<32> cpsr;
+        std::bitset<32> prevCpsr;
         std::bitset<32> spsr;
+        std::bitset<32> spsr_svc;
+        uint32_t R1314_svc[2];
+        std::bitset<32> spsr_irq;
+        uint32_t R1314_irq[2];
         uint64_t gbaCycles;
         uint8_t gbaScanline;
         uint16_t lcdControl;
+        uint32_t dmaStartAddress[4];
+        uint32_t dmaEndAddress[4];
+        uint16_t dmaWordCount[4];
+        std::bitset<16> dmaControl0;
+        std::bitset<16> dmaControl1;
+        std::bitset<16> dmaControl2;
+        std::bitset<16> dmaControl3;
 };
 bool breakpoint;
 uint32_t currentOpcode;
@@ -61,6 +75,25 @@ void printRegs()
     }
     std::cout<<"CPSR: "<<gbaREG.cpsr<<std::endl;
 }
+void printDMARegs()
+{
+    printf("DMAstart0: 0x%X\n",gbaREG.dmaStartAddress[0]);
+    printf("DMAend  0: 0x%X\n",  gbaREG.dmaEndAddress[0]);
+    printf("DMAwordC0: 0x%X\n",   gbaREG.dmaWordCount[0]);
+    std::cout<<"DMAcontr0: "<<gbaREG.dmaControl0<<std::endl;
+    printf("DMAstart1: 0x%X\n",gbaREG.dmaStartAddress[1]);
+    printf("DMAend  1: 0x%X\n",  gbaREG.dmaEndAddress[1]);
+    printf("DMAwordC1: 0x%X\n",   gbaREG.dmaWordCount[1]);
+    std::cout<<"DMAcontr1: "<<gbaREG.dmaControl1<<std::endl;
+    printf("DMAstart2: 0x%X\n",gbaREG.dmaStartAddress[2]);
+    printf("DMAend  2: 0x%X\n",  gbaREG.dmaEndAddress[2]);
+    printf("DMAwordC2: 0x%X\n",   gbaREG.dmaWordCount[2]);
+    std::cout<<"DMAcontr2: "<<gbaREG.dmaControl2<<std::endl;
+    printf("DMAstart3: 0x%X\n",gbaREG.dmaStartAddress[3]);
+    printf("DMAend  3: 0x%X\n",  gbaREG.dmaEndAddress[3]);
+    printf("DMAwordC3: 0x%X\n",   gbaREG.dmaWordCount[3]);
+    std::cout<<"DMAcontr3: "<<gbaREG.dmaControl3<<std::endl;
+}
 void memDump()
 {
     FILE* memdump1 = fopen("memdump/biosRAM.nGBA","w+");
@@ -86,11 +119,11 @@ uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
     rotateValNeed = valueNeed;
     if(goRight == true)
     {
-        if(rotateTimes == 0)
-        {
-            return rotateValNeed.to_ulong();
-        }
-        while(rotateTimes != 0xFF)
+        //if(rotateTimes == 0)
+        //{
+        //    return rotateValNeed.to_ulong();
+        //}
+        while(rotateTimes != 0x0)
         {
             backupBit2[0] = rotateValNeed[0];
             rotateValNeed = rotateValNeed >> 1;
@@ -100,11 +133,11 @@ uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
     }
     if(goRight == false)
     {
-        if(rotateTimes == 0)
-        {
-            return rotateValNeed.to_ulong();
-        }
-        while(rotateTimes != 0xFF)
+        //if(rotateTimes == 0)
+        //{
+        //    return rotateValNeed.to_ulong();
+        //}
+        while(rotateTimes != 0x0)
         {
             backupBit2[0] = rotateValNeed[31];
             rotateValNeed = rotateValNeed << 1;
@@ -121,6 +154,7 @@ uint8_t opRN;
 uint8_t opRS;
 uint8_t opRB;
 uint8_t opRM;
+uint8_t opRO;
 bool doFlagUpdate;
 bool B25ShifterDet;
 std::bitset<4> opRDET;
@@ -263,9 +297,16 @@ uint32_t readMem(int readMode, int location)
                 return randoRet0404;
             break;
 
+            case 0x040000BA:
+                return gbaREG.dmaControl0.to_ulong();
+            break;
+
+            case 0x040000DE:
+                return gbaREG.dmaControl3.to_ulong();
+            break;
+
             case 0x04000130:
-                joypadReg.flip(7);
-                return joypadReg.to_ulong();
+                return controlBuffer.to_ulong();
             break;
 
             default:
@@ -396,7 +437,7 @@ uint32_t readMem(int readMode, int location)
     break;
 
     case 0x0E000000 ... 0x0E00FFFF:
-        location -= 0x08000000;
+        location -= 0x0E000000;
         if(readMode == 0)
         {
             return gbaRAM.SaveRAM[location];
@@ -490,6 +531,58 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
                     gbaREG.lcdControl = value;
                 break;
 
+                case 0x040000B0:
+                    gbaREG.dmaStartAddress[0] = value;
+                break;
+
+                case 0x040000B4:
+                    gbaREG.dmaEndAddress[0] = value;
+                break;
+
+                case 0x040000B8:
+                    gbaREG.dmaWordCount[0] = value;
+                    gbaREG.dmaControl0 = value >> 16;
+                break;
+
+                case 0x040000BC:
+                    gbaREG.dmaStartAddress[1] = value;
+                break;
+
+                case 0x040000C0:
+                    gbaREG.dmaEndAddress[1] = value;
+                break;
+
+                case 0x040000C4:
+                    gbaREG.dmaWordCount[1] = value;
+                    gbaREG.dmaControl1 = value >> 16;
+                break;
+
+                case 0x040000C8:
+                    gbaREG.dmaStartAddress[2] = value;
+                break;
+
+                case 0x040000CC:
+                    gbaREG.dmaEndAddress[2] = value;
+                break;
+
+                case 0x040000D0:
+                    gbaREG.dmaWordCount[2] = value;
+                    gbaREG.dmaControl2 = value >> 16;
+                break;
+
+                case 0x040000D4:
+                    gbaREG.dmaStartAddress[3] = value;
+                break;
+
+                case 0x040000D8:
+                    gbaREG.dmaEndAddress[3] = value;
+                break;
+
+                case 0x040000DC:
+                    gbaREG.dmaWordCount[3] = value;
+                    gbaREG.dmaControl3 = value >> 16;
+                break;
+
                 default:
                     printf("THIS IS IO REG STUB WRITE!\n");
                 break;
@@ -525,7 +618,7 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
         case 0x06000000 ... 0x06017FFF:
             if(value != 0)
             {
-                printf("VWRITE!\n");
+                //printf("VWRITE!\n");
             }
             location -= 0x06000000;
             if(writeMode == 0)
@@ -583,9 +676,33 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
             breakpoint = true;
         break;
 
+        case 0x0E000000 ... 0x0E00FFFF:
+            location -= 0x0E000000;
+            if(writeMode == 0)
+            {
+                gbaRAM.SaveRAM[location] = value;
+            }
+            if(writeMode == 1)
+            {
+                printf("INVALID WRITE AMOUNT FOR SRAM!\n");
+                opcodeError = true;
+            }
+            if(writeMode == 2)
+            {
+                printf("INVALID WRITE AMOUNT FOR SRAM!\n");
+                opcodeError = true;
+            }
+        break;
+
         default:
             opcodeError = true;
             printf("Unimplemented Write ADDR 0x%02X\n",location);
         break;
+    }
+    if(location >= 0x040000B0 && location <= 0x040000E0)
+    {
+        //breakpoint = true;
+        printf("DMA REGISTERS WERE WRITTEN TO!\n");
+        printDMARegs();
     }
 }

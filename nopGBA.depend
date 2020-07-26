@@ -1,18 +1,22 @@
 # depslib dependency file v1.0
-1595566293 source:/home/zach/codeblocks/nopGBA/main.cpp
+1595741351 source:/home/zach/codeblocks/nopGBA/main.cpp
 	"cpu.hpp"
 
-1595564061 /home/zach/codeblocks/nopGBA/cpu.hpp
+1595741866 /home/zach/codeblocks/nopGBA/cpu.hpp
 	"cpuTHUMB.hpp"
 
-1595567496 /home/zach/codeblocks/nopGBA/include.hpp
+1595740783 /home/zach/codeblocks/nopGBA/include.hpp
 	<iostream>
 	<bitset>
 	<SDL2/SDL.h>
+	<bits/stdc++.h>
 
-1595567475 /home/zach/codeblocks/nopGBA/cpuTHUMB.hpp
+1595734451 /home/zach/codeblocks/nopGBA/cpuTHUMB.hpp
 	"rendering.hpp"
 
-1595566987 /home/zach/codeblocks/nopGBA/rendering.hpp
+1595739390 /home/zach/codeblocks/nopGBA/rendering.hpp
+	"input.hpp"
+
+1595739821 /home/zach/codeblocks/nopGBA/input.hpp
 	"include.hpp"
 
