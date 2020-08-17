@@ -34,9 +34,20 @@
 		</Compiler>
 		<Linker>
 			<Add option="-lSDL2" />
+			<Add option="-lGLU" />
+			<Add option="-lGL" />
+			<Add option="-lGLEW" />
 		</Linker>
+		<Unit filename="CustomFont.cpp" />
+		<Unit filename="ImGuiFileDialog.cpp" />
 		<Unit filename="cpu.hpp" />
 		<Unit filename="cpuTHUMB.hpp" />
+		<Unit filename="imgui.cpp" />
+		<Unit filename="imgui_demo.cpp" />
+		<Unit filename="imgui_draw.cpp" />
+		<Unit filename="imgui_impl_opengl3.cpp" />
+		<Unit filename="imgui_impl_sdl.cpp" />
+		<Unit filename="imgui_widgets.cpp" />
 		<Unit filename="include.hpp" />
 		<Unit filename="input.hpp" />
 		<Unit filename="main.cpp" />

@@ -1,60 +1,110 @@
 #include "cpu.hpp"
 using namespace std;
 char option;
-uint64_t opcodesRan;
 uint32_t testPrev;
 int main()
 {
     //breakpoint = true;
-    mainScreen = SDL_CreateWindow("nopGBA",0,0,240 * 2,160 * 2,SDL_WINDOW_RESIZABLE);
-    mainRenderer = SDL_CreateRenderer(mainScreen,-1,SDL_RENDERER_ACCELERATED);
-    SDL_RenderSetScale(mainRenderer,2,2);
+    initFunc();
+    glGenTextures(1,&screenTexGL);
+    //SDL_RenderSetScale(mainRenderer,2,2);
     gbaREG.rNUM[13] = 0x03007F00;
     gbaREG.rNUM[14] = 0x08000000;
-    gbaREG.R1314_svc[0] = 0x03007FE0;
+    gbaREG.R1314_svc[0] = 0x03007FD0;
     gbaREG.R1314_svc[1] = 0x08000000;
     gbaREG.R1314_irq[0] = 0x03007F00;
     gbaREG.R1314_irq[1] = 0x08000000;
     gbaREG.rNUM[15] = gbaREG.rNUM[14];
     gbaREG.cpsr = 0x1F;
     gbaREG.spsr = 0x10;
-    loadROM();
-    while(true)
+    //loadROM();
+    while(closenopGBA == false)
     {
+        while(allowRun == false)
+        {
+            handleMainGUI();
+            handleSDLcontrol();
+        }
         testPrev = gbaREG.rNUM[13];
         gbaREG.prevCpsr = gbaREG.cpsr.to_ulong();
         doOpcodeMain();
+        opcodesRan++;
         handleDMA();
+        //printf("R13: 0x%X\n",gbaREG.rNUM[13]);
+        //printf("R13_svc: 0x%X\n",gbaREG.R1314_svc[0]);
+        //printf("R13_1rq: 0x%X\n",gbaREG.R1314_irq[0]);
         if(testPrev != gbaREG.rNUM[13])
         {
             //breakpoint = true;
-            printf("STACK CHANGE!\n");
+            //printf("R13: 0x%X\n",gbaREG.rNUM[13]);
+            //printf("R13_svc: 0x%X\n",gbaREG.R1314_svc[0]);
+            //printf("R13_1rq: 0x%X\n",gbaREG.R1314_irq[0]);
+            //printf("STACK CHANGE!\n");
         }
         checkModeSwitch();
-        //printf("R1: 0x%X\n",gbaREG.rNUM[1]);
-        if(gbaREG.rNUM[15] == 0x0800033C || gbaREG.rNUM[15] == 0x080004EC)
+        //printf("R15: 0x%X\n",gbaREG.rNUM[15]);
+        //breakpoint = true;
+        if(gbaREG.rNUM[15] == breakpointLocation && breakpointEnabled == true)
+        {
+            breakpoint = true;
+        }
+        if(gbaREG.rNUM[15] == 0x0814FCE0)
         {
             //breakpoint = true;
+        }
+        if(gbaREG.rNUM[15] == 0x0800ACA2)
+        {
+            breakpoint = true;
+        }
+        if(opcodesRan == 29131)
+        {
+            //breakpoint = true;
+        }
+        if(gbaREG.rNUM[15] == 0x0814F404)
+        {
+            //breakpoint = true;
+        }
+        if(gbaREG.R1314_svc[0] == 0x03007FC0)
+        {
+            //breakpoint = true;
+        }
+        if(opcodesRan % 13000 == 0)
+        {
+            printf("lcdControl: 0x%X\n",gbaREG.lcdControl);
+            //basicRenderMode4();
+            handleRendering();
+            handleSDLcontrol();
         }
         //std::cout<<"CPSR: "<<gbaREG.cpsr<<std::endl;
         if(breakpoint == true)
         {
-            printf("Opcode Thumb: 0x%X\n",currentThumbOpcode);
             printRegs();
-            //printDMARegs();
-            printf("Opcodes Ran: %i\n",opcodesRan);
-            printf("Would you like to continue?\n");
-            cin>>option;
-            memDump();
-            if(option == 'n')
+            allowRun = false;
+            while(allowRun == false)
             {
-                breakpoint = false;
+                handleMainGUI();
+                handleSDLcontrol();
             }
+            //printf("Opcode Thumb: 0x%X\n",currentThumbOpcode);
+            //printRegs();
+            //printDMARegs();
+            //printf("Opcodes Ran: %i\n",opcodesRan);
+            //printf("Would you like to continue?\n");
+            //cin>>option;
+            //memDump();
+            //if(option == 'n')
+            //{
+            //    breakpoint = false;
+            //}
         }
         //printRegs();
         //printf("PC: 0x%X\n",gbaREG.rNUM[15]);
         if(opcodeError == true)
         {
+
+            allowRun = false;
+            dontDisplayError = false;
+
             printf("LAST THUMB In Binary: ");
             std::cout<<op16bit<<std::endl;
             printf("LAST ARM In Binary: ");
@@ -65,16 +115,23 @@ int main()
             printRegs();
             //printDMARegs();
             printf("Opcodes Ran: %i\n",opcodesRan);
-            cin>>option;
-            return 1;
+            //ImGui_ImplOpenGL3_Shutdown();
+            //ImGui_ImplSDL2_Shutdown();
+            //ImGui::DestroyContext();
+
+            //SDL_GL_DeleteContext(gl_context);
+            //SDL_DestroyWindow(debugScreen);
+            //SDL_Quit();
+            //return 1;
         }
-        opcodesRan++;
-        if(opcodesRan % 6500 == 0)
-        {
-            printf("lcdControl: 0x%X\n",gbaREG.lcdControl);
-            basicRenderMode4();
-            handleSDLcontrol();
-        }
+
     }
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+
+    SDL_GL_DeleteContext(gl_context);
+    SDL_DestroyWindow(debugScreen);
+    SDL_Quit();
     return 0;
 }

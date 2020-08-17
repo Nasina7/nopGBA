@@ -1,22 +1,189 @@
 # depslib dependency file v1.0
-1595741351 source:/home/zach/codeblocks/nopGBA/main.cpp
+1597182540 source:/home/zach/codeblocks/nopGBA/main.cpp
 	"cpu.hpp"
 
-1595741866 /home/zach/codeblocks/nopGBA/cpu.hpp
+1597184045 /home/zach/codeblocks/nopGBA/cpu.hpp
 	"cpuTHUMB.hpp"
 
-1595740783 /home/zach/codeblocks/nopGBA/include.hpp
+1597177996 /home/zach/codeblocks/nopGBA/include.hpp
 	<iostream>
 	<bitset>
 	<SDL2/SDL.h>
 	<bits/stdc++.h>
+	<GL/glew.h>
+	"imgui.h"
+	"ImGuiFileDialog.h"
+	"imgui_memory_editor.h"
+	"imgui_impl_opengl3.h"
+	"imgui_impl_sdl.h"
 
-1595734451 /home/zach/codeblocks/nopGBA/cpuTHUMB.hpp
+1597181617 /home/zach/codeblocks/nopGBA/cpuTHUMB.hpp
 	"rendering.hpp"
 
-1595739390 /home/zach/codeblocks/nopGBA/rendering.hpp
+1597182881 /home/zach/codeblocks/nopGBA/rendering.hpp
 	"input.hpp"
 
-1595739821 /home/zach/codeblocks/nopGBA/input.hpp
+1596637631 /home/zach/codeblocks/nopGBA/input.hpp
 	"include.hpp"
+
+1596483102 source:/home/zach/codeblocks/nopGBA/imgui.cpp
+	"imgui.h"
+	"imgui_internal.h"
+	<ctype.h>
+	<stdio.h>
+	<stddef.h>
+	<stdint.h>
+	<Windows.h>
+	<windows.h>
+	<TargetConditionals.h>
+	"stb_sprintf.h"
+	<Carbon/Carbon.h>
+	<imm.h>
+	"imgui_user.inl"
+
+1596483102 /home/zach/codeblocks/nopGBA/imgui.h
+	"imconfig.h"
+	<float.h>
+	<stdarg.h>
+	<stddef.h>
+	<string.h>
+	<assert.h>
+	<stdint.h>
+	"imgui_user.h"
+
+1596483102 /home/zach/codeblocks/nopGBA/imconfig.h
+
+1596483102 /home/zach/codeblocks/nopGBA/imgui_internal.h
+	<stdio.h>
+	<stdlib.h>
+	<math.h>
+	<limits.h>
+	"imstb_textedit.h"
+
+1596483102 /home/zach/codeblocks/nopGBA/imstb_textedit.h
+	<string.h>
+
+1596483102 source:/home/zach/codeblocks/nopGBA/imgui_demo.cpp
+	"imgui.h"
+	<ctype.h>
+	<limits.h>
+	<math.h>
+	<stdio.h>
+	<stdlib.h>
+	<stddef.h>
+	<stdint.h>
+
+1596483102 source:/home/zach/codeblocks/nopGBA/imgui_draw.cpp
+	"imgui.h"
+	"imgui_internal.h"
+	<stdio.h>
+	<alloca.h>
+	<malloc.h>
+	<stdlib.h>
+	"imstb_rectpack.h"
+	"imstb_truetype.h"
+
+1596483102 /home/zach/codeblocks/nopGBA/imstb_rectpack.h
+	<stdlib.h>
+	<assert.h>
+
+1596483102 /home/zach/codeblocks/nopGBA/imstb_truetype.h
+	"stb_truetype.h"
+	<stdio.h>
+	"stb_truetype.h"
+	<math.h>
+	<math.h>
+	<math.h>
+	<math.h>
+	<math.h>
+	<stdlib.h>
+	<assert.h>
+	<string.h>
+	<string.h>
+
+1596483102 source:/home/zach/codeblocks/nopGBA/imgui_impl_opengl3.cpp
+	"imgui.h"
+	"imgui_impl_opengl3.h"
+	<stdio.h>
+	<stddef.h>
+	<stdint.h>
+	<GLES2/gl2.h>
+	<OpenGLES/ES3/gl.h>
+	<GLES3/gl3.h>
+	<GL/gl3w.h>
+	<GL/glew.h>
+	<glad/glad.h>
+	<glad/gl.h>
+	<glbinding/Binding.h>
+	<glbinding/gl/gl.h>
+	<glbinding/glbinding.h>
+	<glbinding/gl/gl.h>
+
+1596483102 /home/zach/codeblocks/nopGBA/imgui_impl_opengl3.h
+	"imgui.h"
+	"TargetConditionals.h"
+
+1596549638 source:/home/zach/codeblocks/nopGBA/imgui_impl_sdl.cpp
+	"imgui.h"
+	"imgui_impl_sdl.h"
+	<SDL2/SDL.h>
+	<SDL2/SDL_syswm.h>
+	"TargetConditionals.h"
+
+1596483102 /home/zach/codeblocks/nopGBA/imgui_impl_sdl.h
+	"imgui.h"
+
+1596483102 source:/home/zach/codeblocks/nopGBA/imgui_widgets.cpp
+	"imgui.h"
+	"imgui_internal.h"
+	<ctype.h>
+	<stddef.h>
+	<stdint.h>
+	"imstb_textedit.h"
+
+1596562678 /home/zach/codeblocks/nopGBA/ImGuiFileDialog.h
+	"imgui.h"
+	<float.h>
+	<vector>
+	<string>
+	<set>
+	<map>
+	<unordered_map>
+	<functional>
+	<string>
+	<vector>
+	<list>
+	"ImGuiFileDialogConfig.h"
+
+1596014417 /home/zach/codeblocks/nopGBA/ImGuiFileDialogConfig.h
+
+1596014417 source:/home/zach/codeblocks/nopGBA/CustomFont.cpp
+	"CustomFont.h"
+
+1596014417 /home/zach/codeblocks/nopGBA/CustomFont.h
+
+1596014417 source:/home/zach/codeblocks/nopGBA/ImGuiFileDialog.cpp
+	"ImGuiFileDialog.h"
+	"imgui.h"
+	<string.h>
+	<sstream>
+	<iomanip>
+	<time.h>
+	<sys/types.h>
+	<sys/stat.h>
+	<stdio.h>
+	<errno.h>
+	<cctype>
+	<dirent.h>
+	<sys/types.h>
+	<dirent.h>
+	"imgui.h"
+	"imgui_internal.h"
+	<cstdlib>
+	<algorithm>
+	<iostream>
+
+1596563694 /home/zach/codeblocks/nopGBA/imgui_memory_editor.h
+	<stdio.h>
+	<stdint.h>
 

@@ -2,116 +2,66 @@
 <CodeBlocks_layout_file>
 	<FileVersion major="1" minor="0" />
 	<ActiveTarget name="Debug" />
-	<File name="include.hpp" open="1" top="0" tabpos="6" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="imgui_demo.cpp" open="0" top="0" tabpos="0" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="19342" topLine="0" />
-		</Cursor>
-		<Folding>
-			<Collapse line="9" />
-			<Collapse line="30" />
-			<Collapse line="62" />
-			<Collapse line="70" />
-			<Collapse line="78" />
-			<Collapse line="117" />
-			<Collapse line="173" />
-			<Collapse line="182" />
-		</Folding>
-	</File>
-	<File name="input.hpp" open="1" top="0" tabpos="5" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="22" topLine="66" />
-		</Cursor>
-	</File>
-	<File name="main.cpp" open="1" top="0" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
-		<Cursor>
-			<Cursor1 position="2239" topLine="60" />
+			<Cursor1 position="50414" topLine="926" />
 		</Cursor>
 	</File>
 	<File name="cpuTHUMB.hpp" open="1" top="0" tabpos="3" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="6784" topLine="99" />
+			<Cursor1 position="10947" topLine="357" />
 		</Cursor>
 		<Folding>
 			<Collapse line="2" />
 			<Collapse line="11" />
-			<Collapse line="18" />
-			<Collapse line="79" />
-			<Collapse line="140" />
-			<Collapse line="161" />
-			<Collapse line="182" />
-			<Collapse line="190" />
-			<Collapse line="337" />
-			<Collapse line="363" />
-			<Collapse line="407" />
-			<Collapse line="441" />
-			<Collapse line="456" />
-			<Collapse line="489" />
-			<Collapse line="505" />
-			<Collapse line="522" />
-			<Collapse line="540" />
-			<Collapse line="557" />
-			<Collapse line="596" />
-			<Collapse line="645" />
-			<Collapse line="683" />
-			<Collapse line="727" />
-			<Collapse line="742" />
-			<Collapse line="760" />
-			<Collapse line="782" />
-			<Collapse line="795" />
-			<Collapse line="808" />
-			<Collapse line="821" />
-			<Collapse line="837" />
-			<Collapse line="858" />
-			<Collapse line="881" />
-			<Collapse line="915" />
+			<Collapse line="204" />
+			<Collapse line="225" />
+			<Collapse line="246" />
+			<Collapse line="254" />
+		</Folding>
+	</File>
+	<File name="cpu.hpp" open="1" top="1" tabpos="2" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="76907" topLine="300" />
+		</Cursor>
+		<Folding>
+			<Collapse line="19" />
+			<Collapse line="60" />
+			<Collapse line="113" />
+			<Collapse line="231" />
+			<Collapse line="286" />
+			<Collapse line="315" />
+		</Folding>
+	</File>
+	<File name="input.hpp" open="1" top="0" tabpos="5" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="2046" topLine="91" />
+		</Cursor>
+	</File>
+	<File name="main.cpp" open="1" top="0" tabpos="1" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+		<Cursor>
+			<Cursor1 position="1676" topLine="36" />
+		</Cursor>
+		<Folding>
+			<Collapse line="36" />
+			<Collapse line="47" />
+			<Collapse line="51" />
 		</Folding>
 	</File>
 	<File name="rendering.hpp" open="1" top="0" tabpos="4" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="20" topLine="0" />
+			<Cursor1 position="1762" topLine="35" />
 		</Cursor>
 	</File>
-	<File name="cpu.hpp" open="1" top="1" tabpos="2" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
+	<File name="include.hpp" open="1" top="0" tabpos="6" split="0" active="1" splitpos="0" zoom_1="0" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="85708" topLine="593" />
+			<Cursor1 position="5912" topLine="76" />
 		</Cursor>
 		<Folding>
-			<Collapse line="21" />
-			<Collapse line="62" />
-			<Collapse line="114" />
-			<Collapse line="168" />
-			<Collapse line="223" />
-			<Collapse line="252" />
-			<Collapse line="283" />
-			<Collapse line="314" />
-			<Collapse line="338" />
-			<Collapse line="361" />
-			<Collapse line="389" />
-			<Collapse line="417" />
-			<Collapse line="471" />
-			<Collapse line="502" />
-			<Collapse line="617" />
-			<Collapse line="980" />
-			<Collapse line="1006" />
-			<Collapse line="1020" />
-			<Collapse line="1094" />
-			<Collapse line="1135" />
-			<Collapse line="1176" />
-			<Collapse line="1260" />
-			<Collapse line="1348" />
-			<Collapse line="1421" />
-			<Collapse line="1494" />
-			<Collapse line="1578" />
-			<Collapse line="1652" />
-			<Collapse line="1729" />
-			<Collapse line="1977" />
-			<Collapse line="2097" />
-			<Collapse line="2181" />
-			<Collapse line="2200" />
-			<Collapse line="2215" />
-			<Collapse line="2231" />
-			<Collapse line="2270" />
-			<Collapse line="2613" />
+			<Collapse line="37" />
+			<Collapse line="70" />
+			<Collapse line="78" />
+			<Collapse line="86" />
 		</Folding>
 	</File>
 </CodeBlocks_layout_file>

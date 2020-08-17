@@ -95,13 +95,15 @@ int handleControls()
         }
     return 0;
 }
+bool closenopGBA;
 int handleSDLcontrol()
 {
     while( SDL_PollEvent( &SDL_EVENT_HANDLING)) // While Event to handle Random Stuff
         {
+            ImGui_ImplSDL2_ProcessEvent(&SDL_EVENT_HANDLING);
             if (SDL_EVENT_HANDLING.type == SDL_QUIT) // If the SDL Window is Closed, close the program.
             {
-                opcodeError = true;
+                closenopGBA = true;
             }
             if (SDL_EVENT_HANDLING.type == SDL_KEYDOWN) // If a key is being pressed, handle controls.
             {   // Handle Controls
