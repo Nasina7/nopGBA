@@ -118,7 +118,8 @@ void checkModeSwitch()
     prevMode = checkMode.to_ulong();
     if(currentMode != prevMode)
     {
-        //printf("PrevMode: 0x%X\n",prevModeSwitch);
+        printf("PrevMode: 0x%X\n",prevModeSwitch);
+        printf("CurrentMode: 0x%X\n",currentMode);
         switch(currentMode)
         {
 
@@ -140,6 +141,8 @@ void checkModeSwitch()
                     break;
 
                     case 0x1F:
+                        printf("MR13irq: 0x%X\n",gbaREG.R1314_irq[0]);
+                        printf("MR14irq: 0x%X\n",gbaREG.R1314_irq[1]);
                         swapVar = gbaREG.rNUM[13];
                         gbaREG.rNUM[13] = gbaREG.R1314_irq[0];
                         gbaREG.R1314_irq[0] = swapVar;
@@ -789,14 +792,14 @@ int loadStoreOp()
 {
     op32bit = currentOpcode;
     //std::cout<<"Opcode: "<<op32bit<<std::endl;
-    iBit = op32bit[25];
-    pBit = op32bit[24];
-    uBit = op32bit[23];
-    bBit = op32bit[22];
-    wBit = op32bit[21];
-    lBit = op32bit[20];
+    iBit = op32bit[25]; // 0
+    pBit = op32bit[24]; // 1
+    uBit = op32bit[23]; // 0
+    bBit = op32bit[22]; // 0
+    wBit = op32bit[21]; // 0
+    lBit = op32bit[20]; // 1
     opRDET = currentOpcode >> 16;
-    opRN = opRDET.to_ulong();
+    opRN = opRDET.to_ulong(); // R0
     //printf("opRN: 0x%X\n",opRN);
     //std::cout<<"ibit: "<<iBit<<std::endl;
     PWLSval = pBit << 1 | wBit;
@@ -863,7 +866,9 @@ int loadStoreOp()
                 {
                     offset_12B = currentOpcode;
                     offset_12 = offset_12B.to_ulong();
+                    printf("offset_12B: 0x%X\n",offset_12);
                     writeReadAddress = gbaREG.rNUM[opRN] - offset_12;
+                    printf("wrAddress: 0x%X\n",writeReadAddress);
                     //printf("WRAddress: 0x%X\n",writeReadAddress);
                     if(opRN == 0xF)
                     {
@@ -1229,7 +1234,7 @@ void addOP()
                 break;
 
                 case 2:
-                    shifterResult = getLSLbyIMM();
+                    shifterResult = getLSRbyIMM();
                 break;
 
                 default:
@@ -2515,7 +2520,11 @@ void opLoadStoreMultiple()
                     regUseOther += 4;
                 }
             }
-            loopRegList--;
+            loopRegList -= 1;
+            if(loopRegList > 0xF && loopRegList != 0xFF)
+            {
+                printf("loopREG: 0x%X\n",loopRegList);
+            }
 
         }
         if(wBit == 1)
@@ -2549,6 +2558,10 @@ void opLoadStoreMultiple()
                 }
             }
             loopRegList++;
+            if(loopRegList > 0xF && loopRegList != 0xFF)
+            {
+                printf("loopREG: 0x%X\n",loopRegList);
+            }
         }
         if(wBit == 1)
         {
@@ -2557,6 +2570,7 @@ void opLoadStoreMultiple()
     }
     //breakpoint = true;
     gbaREG.rNUM[15] += 4;
+    //printf("TEST2\n");
 }
 void opMultiplyMUL()
 {
@@ -3111,4 +3125,47 @@ int doOpcodeMain()
         return 0;
     }
 
+}
+std::bitset<16> checkIE;
+uint8_t IEcount;
+bool endWhile;
+void handleInterrupts()
+{
+    if(gbaREG.IME == true && gbaREG.currentlyHalted == true)
+    {
+        checkIE = gbaREG.IE;
+        IEcount = 0;
+        endWhile = false;
+        while(IEcount != 16 || endWhile == false)
+        {
+            if(checkIE[IEcount] == 1)
+            {
+                endWhile = true;
+            }
+            IEcount++;
+        }
+        if(endWhile == true)
+        {
+            switch(IEcount)
+            {
+                default: // This is heavily stubbed right now, but whatever.  I just want games to run right now.  I'll fix it later.
+                    printf("Doing Hardware Interrupt from bit 0x%X!\n",IEcount);
+                    gbaREG.R1314_irq[1] = gbaREG.rNUM[15] + 4;
+                    printf("R13irq: 0x%X\n",gbaREG.R1314_irq[0]);
+                    printf("R14irq: 0x%X\n",gbaREG.R1314_irq[1]);
+                    gbaREG.spsr_irq = gbaREG.cpsr.to_ulong();
+                    gbaREG.rNUM[15] = 0x18;
+                    gbaREG.cpsr[5] = 0;
+                    gbaREG.cpsr[4] = 1;
+                    gbaREG.cpsr[3] = 0;
+                    gbaREG.cpsr[2] = 0;
+                    gbaREG.cpsr[1] = 1;
+                    gbaREG.cpsr[0] = 0;
+                    //breakpoint = true;
+                    printf("Are we supposed to swap to SVC?\n");
+                    gbaREG.currentlyHalted = false;
+                break;
+            }
+        }
+    }
 }

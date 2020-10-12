@@ -1,0 +1,86 @@
+Games potentially showing graphics:
+Mario Golf (Mode 1)
+
+Kirby and the Amazing Mirror - Unimplemented Shifter opernand B25: 0 and B6tB4: 0x6
+
+Kirby NID (Mode 7)           - In Loop
+
+Kirby NID                    - Thumb Long Branch With Link Error!
+
+Mario & Luigi Superstar Saga - Unknown Read Address 0xFE100000
+
+Super Mario Advance 1        - WRITE TO ROM ERROR!
+
+Super Mario Advance 2(Mode 7)- Unimplemented Condition 0xB!
+
+Super Mario Advance 2        - Unimplemented Write Address 0x06018000
+
+Super Mario Advance 3(Mode 7)- Loops trying to change BG1 X Offset.  (Showing graphics?)
+
+Super Mario Advance 3        - Write to ROM
+
+Super Mario Advance 4        - Unimplemented Write Address 0x06018000
+
+Super Mario Golf             - Unimplemented MISC Instruction (Showing Nintendo Logo?)
+
+Mario Party Advance          - Unknown Read Address 0xFE100000
+
+Mario Pinball Land           - Unknown Write Address 0x208
+
+Mario VS DK                  - Unknown Write Address 0x7000400
+
+Mario Kart Super Circuit     - Unimplemented MISC Instruction
+
+Pokemon Emerald              - Unknown Read Address 0xFE100000
+
+Pokemon Fire Red             - Unknown Read Address 0xFE100000
+
+Sonic Advance 1              - Unimplemented Multiply 0x4. (Used Incorrect Jump?)
+
+Sonic Advance 2              - Unimplemented Multiply 0x4. (Used Incorrect Jump?)
+
+Sonic Advance 3              - Stuck in loop with WARN 0xD?
+
+Sonic Battle                 - Unimplemented Write Address 0x5000402
+
+Sonic Genesis                - Write to Rom
+
+Sonic Pinball Party  (VENOM) - Unimplemented OP XXXX000 then 0x6!
+
+Sonic Pinball Party          - Unimplemented Shifter Opernand B25: 0 and B6tB4: 0x1
+
+Tetris Worlds                - Write to ROM
+
+The Legend of Z: LTTP(Mode 7)- In loop
+
+The Legend of Z: LTTP        - Unknown Write Address 0x208
+
+The Legend of Zelda: Minish  - Unknown Read Address 0xFE100000
+
+Most Common Error Codes:
+8: UNIMPLEMENTED 010001 THUMB OPCODE
+7 + 1/6: Invalid Write Address
+6: Waiting for Interrupts
+1/2: Stuck in infinite loop
+
+
+Armwrestler:     - Shows Grapics, can use input in menu.  Tests don't work due to incomplete cpu.
+    Test 1: Unimplemented Type of move2 0x1
+    Test 2: Unimplemented shiftOP mode 0x1
+    Test 3: Write to ROM
+    Test 4: Stuck in Infinite Loop
+    Test 5: Stuck in Infinite Loop
+    Test 6: Stuck in Infinite Loop
+
+Aging.gba                    - Write to ROM
+Hello.gba                    - Unknown Read Address 0xFE100000
+CPUTest.gba                  - Infinite Loop
+thumb.gba                    - Unknown Read Address 0xFF00
+badapple.gba                 - Stuck in loop reading from timers
+
+Bios issues:
+00000158: R11 anded with 1f, put in r11, was set to zero.  Z flag was set, but no&gba didnt set
+doesn't seem to have mattered though
+00000B4E: R4 was set to 80000.  Carry flag got set.  no$gba says otherwise
+doesn't seem to have mattered though
+00000BA4: Compared 0 to r12 containing 400.  C flag was not set.  no$gba says otherwise

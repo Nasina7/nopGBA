@@ -121,7 +121,7 @@ void handleRendering()
 
         default:
             printf("Unimplemented Render Mode 0x%X!\nDefaulting to Mode 4!\n");
-            //basicRenderMode4();
+            basicRenderMode4();
         break;
     }
 

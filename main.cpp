@@ -27,20 +27,13 @@ int main()
         }
         testPrev = gbaREG.rNUM[13];
         gbaREG.prevCpsr = gbaREG.cpsr.to_ulong();
-        doOpcodeMain();
+        if(gbaREG.currentlyHalted == false)
+        {
+            doOpcodeMain();
+        }
+        handleInterrupts();
         opcodesRan++;
         handleDMA();
-        //printf("R13: 0x%X\n",gbaREG.rNUM[13]);
-        //printf("R13_svc: 0x%X\n",gbaREG.R1314_svc[0]);
-        //printf("R13_1rq: 0x%X\n",gbaREG.R1314_irq[0]);
-        if(testPrev != gbaREG.rNUM[13])
-        {
-            //breakpoint = true;
-            //printf("R13: 0x%X\n",gbaREG.rNUM[13]);
-            //printf("R13_svc: 0x%X\n",gbaREG.R1314_svc[0]);
-            //printf("R13_1rq: 0x%X\n",gbaREG.R1314_irq[0]);
-            //printf("STACK CHANGE!\n");
-        }
         checkModeSwitch();
         //printf("R15: 0x%X\n",gbaREG.rNUM[15]);
         //breakpoint = true;
@@ -48,11 +41,11 @@ int main()
         {
             breakpoint = true;
         }
-        if(gbaREG.rNUM[15] == 0x0814FCE0)
+        if(gbaREG.rNUM[15] == 0x134)
         {
-            //breakpoint = true;
+            breakpoint = true;
         }
-        if(gbaREG.rNUM[15] == 0x0800ACA2)
+        if(gbaREG.rNUM[15] == 0x08007312)
         {
             breakpoint = true;
         }

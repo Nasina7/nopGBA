@@ -56,6 +56,10 @@ class nGBACPU
         std::bitset<16> dmaControl2;
         std::bitset<16> dmaControl3;
         uint16_t LY;
+        bool IME;
+        bool HALTCNT;
+        bool currentlyHalted;
+        uint16_t IE;
 };
 bool breakpoint;
 uint32_t currentOpcode;
@@ -236,6 +240,10 @@ uint8_t fix2;
 uint8_t fix3;
 uint8_t fix4;
 uint8_t randoRet0404;
+std::bitset<16> IntReg;
+std::bitset<16> IntVal;
+uint8_t IntCountW;
+uint16_t location16;
 uint32_t readMem(int readMode, int location)
 {
     switch(location)
@@ -301,6 +309,36 @@ uint32_t readMem(int readMode, int location)
 
     case 0x03000000 ... 0x03007FFF:
         location -= 0x03000000;
+        if(readMode == 0)
+        {
+            return gbaRAM.onChipWRAM[location];
+        }
+        if(readMode == 1)
+        {
+            return16 = gbaRAM.onChipWRAM[location] << 8 |
+                       gbaRAM.onChipWRAM[location + 1];
+            fix1 = return16 >> 8;
+            fix2 = return16;
+            return16 = fix2 << 8 | fix1;
+            return return16;
+        }
+        if(readMode == 2)
+        {
+            return32 = gbaRAM.onChipWRAM[location] << 24 |
+                       gbaRAM.onChipWRAM[location + 1] << 16 |
+                       gbaRAM.onChipWRAM[location + 2] << 8 |
+                       gbaRAM.onChipWRAM[location + 3];
+            fix1 = return32 >> 24;
+            fix2 = return32 >> 16;
+            fix3 = return32 >> 8;
+            fix4 = return32;
+            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
+            return return32;
+        }
+    break;
+
+    case 0x03008000 ... 0x03FFFFFF:
+        location = location & 0x7FFF;
         if(readMode == 0)
         {
             return gbaRAM.onChipWRAM[location];
@@ -515,6 +553,12 @@ uint32_t readMem(int readMode, int location)
             return return32;
         }
     break;
+
+    default:
+        printf("Unknown Read Address 0x%X\n",location);
+        opcodeError = true;
+        return 0;
+    break;
     }
 }
 std::bitset<24> getLowerBits;
@@ -663,8 +707,37 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
                     gbaREG.dmaControl3 = value >> 16;
                 break;
 
+                case 0x04000200:
+                    printf("Software is currently attempting to enable Interrupts!\n");
+                    IntReg = gbaREG.IE;
+                    IntVal = value;
+                    IntCountW = 0;
+                    for(IntCountW = 0; IntCountW < 0x10; IntCountW++)
+                    {
+                        if(IntVal[IntCountW] == 1)
+                        {
+                            IntReg.flip(IntCountW);
+                        }
+                    }
+                    gbaREG.IE = IntReg.to_ulong();
+                break;
+
+                case 0x04000202:
+                    printf("IF WRITTEN TO!\n");
+                    breakpoint = true;
+                break;
+
+                case 0x04000208:
+                    gbaREG.IME = value;
+                break;
+
+                case 0x04000301:
+                    gbaREG.HALTCNT = value >> 7;
+                    gbaREG.currentlyHalted = true;
+                break;
+
                 default:
-                    printf("IOREG NO!WRITE 0x%X!\n",location);
+                    printf("Unimplemented IO reg 0x%X Written to!  Value was 0x%X!\n",location,value);
                 break;
             }
         break;
@@ -900,6 +973,7 @@ bool displayREGView;
 bool displayCPSRView;
 bool displayExtraView;
 bool displayBreakpointView;
+bool displayIntRegs;
 bool displayBIOSRam;
 bool displayOBRam;
 bool displayOCRam;
@@ -975,9 +1049,14 @@ void handleDebugWindow()
     {
         resetEMU();
     }
+    if(ImGui::Button("Boot BIOS"))
+    {
+        resetEMU();
+    }
     ImGui::Checkbox("Display RAM Viewer",&displayRAMView);
     ImGui::Checkbox("Display Register Viewer",&displayREGView);
     ImGui::Checkbox("Display CPSR",&displayCPSRView);
+    ImGui::Checkbox("Display Interrupt Register Viewer",&displayIntRegs);
     ImGui::Checkbox("Display Extra Values",&displayExtraView);
     ImGui::Checkbox("Display Breakpoint Options",&displayBreakpointView);
     ImGui::End();
@@ -1023,6 +1102,13 @@ void handleDebugWindow()
         ImGui::Checkbox("FIQ FLAG",&fiqFlag);
         ImGui::Checkbox("Thumb Mode",&thumbMode);
         ImGui::InputScalar("Current Mode", ImGuiDataType_U8, &curMode, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::End();
+    }
+    if(displayIntRegs == true)
+    {
+        ImGui::Begin("Interrupt Registers");
+        ImGui::Checkbox("IME",&gbaREG.IME);
+        ImGui::InputScalar("IE", ImGuiDataType_U16, &gbaREG.IE, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::End();
     }
     if(displayRAMView == true)
