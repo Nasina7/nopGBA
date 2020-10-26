@@ -15,6 +15,7 @@ void handleSignFlag(uint32_t result)
 }
 uint64_t result64;
 std::bitset<33> resultBitset;
+bool checkLSRFlag;
 void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint64_t valueUsed)
 {
     /*
@@ -24,6 +25,9 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
         2 = Add
         3 = Subtract
         4 = Logical Shift Right
+        5 = Rotate Right
+        6 = Logical Shift Left
+        7 = Multiply
     */
     switch(operation)
     {
@@ -108,11 +112,63 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
         break;
 
         case 4:
-            gbaREG.cpsr[29] = 0;
-            if(result == 0)
+            checkLSRFlag = ( original >> valueUsed - 1) & 0x1;
+            gbaREG.cpsr[29] = checkLSRFlag;
+        break;
+
+        case 5:
+            checkLSRFlag = (rotateValue32(true,valueUsed - 1,original) & 0x1);
+            printf("LSRFLAG: 0x%X\n",checkLSRFlag);
+            gbaREG.cpsr[29] = checkLSRFlag;
+        break;
+
+        case 6:
+            checkLSRFlag = (LSL(original, valueUsed - 1) & 0x80000000);
+            gbaREG.cpsr[29] = checkLSRFlag;
+        break;
+
+        case 7:
+            //printf("orig: 0x%X\n",original);
+            //printf("valUse: 0x%X\n",valueUsed);
+            /*
+            resultBitset = original + valueUsed;  IS THIS CORRECT?
+            gbaREG.cpsr[29] = resultBitset[32];
+            */
+            /*
+            result64 = original + valueUsed;
+            if(result64 < original)
             {
                 gbaREG.cpsr[29] = 1;
             }
+            if(result64 >= original)
+            {
+                gbaREG.cpsr[29] = 0;
+            }
+            */
+            result64 = original * valueUsed;
+            if(result64 > 0xFFFFFFFF)
+            {
+                gbaREG.cpsr[29] = 1;
+            }
+            if(result64 <= 0xFFFFFFFF)
+            {
+                gbaREG.cpsr[29] = 0;
+            }
+            //gbaREG.cpsr[29] = 0;
+            //if(result < original)
+            //{
+            //    gbaREG.cpsr[29] = 1;
+            //}
+            /*
+            if(((original ^ valueUsed ^ result) & 0x100000000) == 0x100000000)
+            {
+                gbaREG.cpsr[29] = 1;
+            }
+            if(((original ^ valueUsed ^ result) & 0x100000000) != 0x100000000)
+            {
+                gbaREG.cpsr[29] = 0;
+            }
+            */
         break;
 
         default:
@@ -183,6 +239,27 @@ void handleOverflowFlag(int32_t original, int32_t result, uint8_t operation, int
             {
                 gbaREG.cpsr[28] = 1;
             }
+        break;
+
+        case 5:
+            result32T = original;
+            result32T *= valueUsed;
+            gbaREG.cpsr[28] = 0;
+            /*
+            if(result64T < -2147483648)
+            {
+                gbaREG.cpsr[28] = 1;
+            }
+            */
+            if(result32T < original)
+            {
+                gbaREG.cpsr[28] = 1;
+            }
+            //gbaREG.cpsr[28] = 0;
+            //if(result > original)
+            //{
+            //    gbaREG.cpsr[28] = 1;
+            //}
         break;
 
         default:
@@ -354,7 +431,7 @@ void thumbConditionalBranch()
         break;
 
         case 0xA:
-            printf("WARN 2!\n");
+            //printf("WARN 2!\n");
             if(gbaREG.cpsr[31] == gbaREG.cpsr[28])
             {
                 doConditionBranch();
@@ -381,7 +458,7 @@ void thumbConditionalBranch()
         break;
 
         case 0xC:
-            printf("WARN C!\n");
+            //printf("WARN C!\n");
             if(gbaREG.cpsr[31] == 1 && gbaREG.cpsr[28] == 1 && gbaREG.cpsr[30] == 0)
             {
                 doConditionBranch();
@@ -427,7 +504,7 @@ void thumbConditionalBranch()
                        gbaREG.rNUM[2]);
                 if(gbaREG.rNUM[1] == 0x5DCE0B4)
                 {
-                    breakpoint = true;
+                    //breakpoint = true;
                 }
             }
             if(offsetBranchBit.to_ulong() == 0xC)
@@ -688,6 +765,7 @@ void thumbOP001strORldr()
         offset5u = offset5u << 2;
     }
     addValforSTRorLDR = gbaREG.rNUM[opRB] + offset5u;
+    //printf("ADDVALSTR: 0x%X\n",addValforSTRorLDR);
     if(op16bit[12] == 0 && op16bit[11] == 0)
     {
         writeMem(2,addValforSTRorLDR,gbaREG.rNUM[opRD]);
@@ -785,12 +863,12 @@ void thumbMovASR()
     thumboffset5 = thumbOffset5B.to_ulong();
     ZOriginal = gbaREG.rNUM[opRD];
     ASRtemp = ZOriginal;
-    ASRtemp = ASRtemp >> thumboffset5;
+    ASRtemp = ASLvaluebyNum(ASRtemp,thumboffset5);
     gbaREG.rNUM[opRD] = ASRtemp;
 
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
-    handleCarryFlag(0,0,1,0);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],4,thumboffset5);
 
     gbaREG.rNUM[15] += 2;
     //breakpoint = true;
@@ -848,7 +926,7 @@ void thumbOPMoveHI()
     {
         opRD += 8;
     }
-    if(opRD != 0xF)
+    if(opRD != 0xF && opRS != 0xF)
     {
         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS];
     }
@@ -858,7 +936,15 @@ void thumbOPMoveHI()
         fixThumbMovHI[0] = 0;
         gbaREG.rNUM[opRD] = fixThumbMovHI.to_ulong();
     }
-    gbaREG.rNUM[15] += 2;
+    if(opRS == 0xF)
+    {
+        gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS] + 4;
+        printf("NOTE: This could cause bugs!\n");
+    }
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 2;
+    }
 }
 void thumbOP010000CMP()
 {
@@ -875,15 +961,17 @@ void thumbOP010000CMP()
 }
 void thumbOP010000MUL()
 {
+    //breakpoint = true;
     opRDET3B = currentThumbOpcode;
     opRD = opRDET3B.to_ulong();
     opRDET3B = currentThumbOpcode >> 3;
     opRS = opRDET3B.to_ulong();
-    handleCarryFlag(gbaREG.rNUM[opRD],gbaREG.rNUM[opRD] * gbaREG.rNUM[opRS],3,gbaREG.rNUM[opRS]);
-    handleOverflowFlag(gbaREG.rNUM[opRD],gbaREG.rNUM[opRD] * gbaREG.rNUM[opRS],3,gbaREG.rNUM[opRS]);
+    handleCarryFlag(gbaREG.rNUM[opRD],gbaREG.rNUM[opRD] * gbaREG.rNUM[opRS],7,gbaREG.rNUM[opRS]);
+    handleOverflowFlag(gbaREG.rNUM[opRD],gbaREG.rNUM[opRD] * gbaREG.rNUM[opRS],5,gbaREG.rNUM[opRS]);
+    ZOriginal = gbaREG.rNUM[opRD];
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] * gbaREG.rNUM[opRS];
-    handleSignFlag(cmpResultThumb);
-    handleZeroFlag(gbaREG.rNUM[opRD],cmpResultThumb);
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
     gbaREG.rNUM[15] += 2;
 }
 void thumbOP010000TST()
@@ -992,17 +1080,22 @@ void thumbOPMVN()
     handleCarryFlag(0,0,1,0);
     gbaREG.rNUM[15] += 2;
 }
+uint32_t lslRes;
 void thumbOPLSL()
 {
+    //breakpoint = true;
     opRDET3B = currentThumbOpcode;
     opRD = opRDET3B.to_ulong();
     opRDET3B = currentThumbOpcode >> 3;
     opRS = opRDET3B.to_ulong();
     ZOriginal = gbaREG.rNUM[opRD];
-    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] << gbaREG.rNUM[opRS];
+    //printf("op1: 0x%X\n",gbaREG.rNUM[opRD]);
+    //printf("op2: 0x%X\n",gbaREG.rNUM[opRS]);
+    gbaREG.rNUM[opRD] = LSL(gbaREG.rNUM[opRD],gbaREG.rNUM[opRS]);
+    //printf("op3: 0x%X\n",gbaREG.rNUM[opRD]);
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
-    handleCarryFlag(0,0,1,0);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],6,gbaREG.rNUM[opRS]);
     gbaREG.rNUM[15] += 2;
 }
 void thumbOPLSR()
@@ -1015,7 +1108,33 @@ void thumbOPLSR()
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] >> gbaREG.rNUM[opRS];
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
-    handleCarryFlag(0,0,1,0);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],4,gbaREG.rNUM[opRS]);
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOPSBC()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = (gbaREG.rNUM[opRD] - gbaREG.rNUM[opRS]) - gbaREG.cpsr[29];
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],3,gbaREG.rNUM[opRS]);
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOPROR()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = rotateValue32(true,gbaREG.rNUM[opRS],gbaREG.rNUM[opRD]);
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],5,gbaREG.rNUM[opRS]);
     gbaREG.rNUM[15] += 2;
 }
 void thumbOPASR()
@@ -1028,7 +1147,7 @@ void thumbOPASR()
     gbaREG.rNUM[opRD] = ASLvaluebyNum(gbaREG.rNUM[opRD],gbaREG.rNUM[opRS]);
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
-    handleCarryFlag(0,0,1,0);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],4,gbaREG.rNUM[opRS]);
     gbaREG.rNUM[15] += 2;
 }
 void thumbOPOR()
@@ -1114,7 +1233,7 @@ void thumbOPloadStorewRegisterOffset()
     opRO = opRDET3B.to_ulong();
     op16bit = currentThumbOpcode;
     LBoption = op16bit[11] << 1 | op16bit[10];
-    printf("This is probably incorrect\n");
+    //printf("This is probably incorrect\n");
     switch(LBoption)
     {
         case 0:
@@ -1139,6 +1258,8 @@ void thumbOPloadStorewRegisterOffset()
 std::bitset<16> offset11B;
 std::bitset<11> offset11B2;
 int16_t offset11N;
+int32_t signExtend3;
+uint16_t andResult;
 void thumbOPUnconditionalBranch()
 {
     offset11B2 = currentThumbOpcode;
@@ -1166,7 +1287,7 @@ void thumbOPLoadStoreSignExtendByteOrHalfword()
     opRB = opRDET3B.to_ulong();
     opRDET3B = currentThumbOpcode >> 6;
     opRO = opRDET3B.to_ulong();
-    switch(op16bit[10])
+    switch(op16bit[10]) // S
     {
         case 0: // Unsigned
             switch(op16bit[11])
@@ -1191,16 +1312,15 @@ void thumbOPLoadStoreSignExtendByteOrHalfword()
                     {
                         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] | 0xFFFFFF00;
                     }
-                    printf("Are these supposed to be swapped?\n");
                 break;
 
                 case 1: // Signed Load Halfword
                     gbaREG.rNUM[opRD] = readMem(1,gbaREG.rNUM[opRB] + gbaREG.rNUM[opRO]);
-                    if(gbaREG.rNUM[opRD] & 0x8000 != 0)
+                    andResult = gbaREG.rNUM[opRD] & 0x8000;
+                    if(andResult != 0)
                     {
                         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] | 0xFFFF0000;
                     }
-                    printf("Are these supposed to be swapped?\n");
                 break;
             }
         break;
@@ -1222,7 +1342,7 @@ void doThumbOpcode(uint16_t opcode)
                 case 0: // 00
                     switch(op16bit[13])
                     {
-                        case 0:
+                        case 0:// 000
                             op000Thumb = currentThumbOpcode >> 11;
                             op000Thumbu = op000Thumb.to_ulong();
                             switch(op000Thumbu)
@@ -1316,6 +1436,14 @@ void doThumbOpcode(uint16_t opcode)
 
                                                         case 0x4:
                                                             thumbOPASR();
+                                                        break;
+
+                                                        case 0x6:
+                                                            thumbOPSBC();
+                                                        break;
+
+                                                        case 0x7:
+                                                            thumbOPROR();
                                                         break;
 
                                                         case 0x8:

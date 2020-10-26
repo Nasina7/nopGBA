@@ -577,7 +577,7 @@ void movOPLSRbyImmediate()
     {
         handleSignFlag(gbaREG.rNUM[opRD]);
         handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
-        handleCarryFlag(0,0,1,0);
+        handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],4,offset5u);
     }
     gbaREG.rNUM[15] += 4;
 }
@@ -1142,10 +1142,18 @@ int loadStoreOp()
     if(bBit == 0 && lBit == 1)
     {
         gbaREG.rNUM[opRD] = readMem(2,writeReadAddress);
+        if(opRD == 0xF)
+        {
+            breakpoint = true;
+        }
     }
     if(bBit == 1 && lBit == 1)
     {
         gbaREG.rNUM[opRD] = readMem(0,writeReadAddress);
+        if(opRD == 0xF)
+        {
+            breakpoint = true;
+        }
     }
     gbaREG.rNUM[15] += 4;
     return 0;
@@ -1233,8 +1241,20 @@ void addOP()
                     }
                 break;
 
+                case 1:
+                    opRDET = currentOpcode;
+                    opRM = opRDET.to_ulong();
+                    opRDET = currentOpcode >> 8;
+                    opRS = opRDET.to_ulong();
+                    shifterResult = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                break;
+
                 case 2:
                     shifterResult = getLSRbyIMM();
+                break;
+
+                case 4:
+                    shifterResult = getASRbyIMM();
                 break;
 
                 default:
@@ -1439,6 +1459,18 @@ void opEOR()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] ^ immed8VAL;
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
                 B32Bit = immed8VAL;
@@ -1447,6 +1479,14 @@ void opEOR()
                 //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                 //printf("RS: 0x%X\n",opRN);
                 //printf("RD: 0x%X\n",opRD);
+                gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] ^ immed8VAL;
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
                 gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] ^ immed8VAL;
             break;
 
@@ -1537,8 +1577,28 @@ void opOR()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] | immed8VAL;
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] | immed8VAL;
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
                 B32Bit = immed8VAL;
                 gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
@@ -1619,12 +1679,32 @@ void opCMP()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] - immed8VAL;
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
                 B32Bit = immed8VAL;
                 gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] - immed8VAL;
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] = immed8VAL;
             break;
 
             default:
@@ -1702,8 +1782,28 @@ void opCMN()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] + immed8VAL;
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] + immed8VAL;
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
                 B32Bit = immed8VAL;
                 gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
@@ -1796,8 +1896,21 @@ void opSUB()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
+                ZOriginal = gbaREG.rNUM[opRD];
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
                 ZOriginal = gbaREG.rNUM[opRD];
             break;
 
@@ -1888,8 +2001,22 @@ void opRSB()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                ZOriginal = gbaREG.rNUM[opRD];
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
+                ZOriginal = gbaREG.rNUM[opRD];
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
                 ZOriginal = gbaREG.rNUM[opRD];
             break;
 
@@ -1970,8 +2097,22 @@ void opADC()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                ZOriginal = gbaREG.rNUM[opRD];
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
+                ZOriginal = gbaREG.rNUM[opRD];
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
                 ZOriginal = gbaREG.rNUM[opRD];
             break;
 
@@ -2060,8 +2201,28 @@ void opTST()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
                 B32Bit = immed8VAL;
                 gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
@@ -2143,8 +2304,28 @@ void opTEQ()
                 }
             break;
 
+            case 1:
+                opRDET = currentOpcode;
+                opRM = opRDET.to_ulong();
+                opRDET = currentOpcode >> 8;
+                opRS = opRDET.to_ulong();
+                immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] ^ immed8VAL;
+            break;
+
             case 2:
                 immed8VAL = getLSRbyIMM();
+                B32Bit = immed8VAL;
+                gbaREG.cpsr[29] = B32Bit[31];
+                ZOriginal = gbaREG.rNUM[opRD];
+                cmpValueA = gbaREG.rNUM[opRN] ^ immed8VAL;
+            break;
+
+            case 4:
+                immed8VAL = getASRbyIMM();
                 B32Bit = immed8VAL;
                 gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
@@ -2389,12 +2570,10 @@ void opLoadStoreHalfwordWithOffset()
                 if(uBit == true)
                 {
                     writeReadAddress = gbaREG.rNUM[opRN] + gbaREG.rNUM[opRM];
-                    gbaREG.rNUM[opRN] = writeReadAddress;
                 }
                 if(uBit == false)
                 {
                     writeReadAddress = gbaREG.rNUM[opRN] - gbaREG.rNUM[opRM];
-                    gbaREG.rNUM[opRN] = writeReadAddress;
                 }
             break;
 
@@ -2432,12 +2611,10 @@ void opLoadStoreHalfwordWithOffset()
                 if(uBit == true)
                 {
                     writeReadAddress = gbaREG.rNUM[opRN] + offset8Immed;
-                    gbaREG.rNUM[opRN] = writeReadAddress;
                 }
                 if(uBit == false)
                 {
                     writeReadAddress = gbaREG.rNUM[opRN] - offset8Immed;
-                    gbaREG.rNUM[opRN] = writeReadAddress;
                 }
             break;
 
@@ -2465,13 +2642,29 @@ void opLoadStoreHalfwordWithOffset()
     }
     opRDET = currentOpcode >> 12;
     opRD = opRDET.to_ulong();
-    if(lBit == 0)
+    if(registerIndexDetermine == 0x00)
     {
-        writeMem(1,writeReadAddress,gbaREG.rNUM[opRD]);
+        if(lBit == 0)
+        {
+            writeMem(1,gbaREG.rNUM[opRN],gbaREG.rNUM[opRD]);
+            gbaREG.rNUM[opRN] = writeReadAddress;
+        }
+        if(lBit == 1)
+        {
+            gbaREG.rNUM[opRD] = readMem(1,gbaREG.rNUM[opRN]);
+            gbaREG.rNUM[opRN] = writeReadAddress;
+        }
     }
-    if(lBit == 1)
+    if(registerIndexDetermine == 0x02)
     {
-        gbaREG.rNUM[opRD] = readMem(1,writeReadAddress);
+        if(lBit == 0)
+        {
+            writeMem(1,writeReadAddress,gbaREG.rNUM[opRD]);
+        }
+        if(lBit == 1)
+        {
+            gbaREG.rNUM[opRD] = readMem(1,writeReadAddress);
+        }
     }
     gbaREG.rNUM[15] += 4;
 }
@@ -2479,6 +2672,7 @@ std::bitset<16> regListToPushPull;
 uint8_t loopRegList;
 uint32_t regUseOther;
 uint8_t PULSDet;
+bool dontIncPConLoad;
 void opLoadStoreMultiple()
 {
     op32bit = currentOpcode;
@@ -2510,6 +2704,10 @@ void opLoadStoreMultiple()
                 if(lBit == 1)
                 {
                     gbaREG.rNUM[loopRegList] = readMem(2,regUseOther);
+                    if(loopRegList == 0xF)
+                    {
+                        dontIncPConLoad = true;
+                    }
                 }
                 if(lBit == 0)
                 {
@@ -2547,6 +2745,10 @@ void opLoadStoreMultiple()
                 if(lBit == 1)
                 {
                     gbaREG.rNUM[loopRegList] = readMem(2,regUseOther);
+                    if(loopRegList == 0xF)
+                    {
+                        dontIncPConLoad = true;
+                    }
                 }
                 if(lBit == 0)
                 {
@@ -2569,7 +2771,11 @@ void opLoadStoreMultiple()
         }
     }
     //breakpoint = true;
-    gbaREG.rNUM[15] += 4;
+    if(dontIncPConLoad == false)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
+    dontIncPConLoad = false;
     //printf("TEST2\n");
 }
 void opMultiplyMUL()

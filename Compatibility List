@@ -1,39 +1,43 @@
-Games potentially showing graphics:
-Mario Golf (Mode 1)
+Games Showing Graphics:
+Sonic Pinball Party
 
-Kirby and the Amazing Mirror - Unimplemented Shifter opernand B25: 0 and B6tB4: 0x6
+Games potentially showing graphics:
+Mario Golf (Mode 0)
+Kirby Nightmare in Dreamland (Mode 0?)
+
+Kirby and the Amazing Mirror - Thumb Long Branch With Link Error!
 
 Kirby NID (Mode 7)           - In Loop
 
-Kirby NID                    - Thumb Long Branch With Link Error!
+Kirby NID                    - Shows Graphics, Infinite Loop
 
-Mario & Luigi Superstar Saga - Unknown Read Address 0xFE100000
+Mario & Luigi Superstar Saga - WRITE TO ROM ERROR!
 
 Super Mario Advance 1        - WRITE TO ROM ERROR!
 
 Super Mario Advance 2(Mode 7)- Unimplemented Condition 0xB!
 
-Super Mario Advance 2        - Unimplemented Write Address 0x06018000
+Super Mario Advance 2        - WRITE TO ROM ERROR!
 
 Super Mario Advance 3(Mode 7)- Loops trying to change BG1 X Offset.  (Showing graphics?)
 
-Super Mario Advance 3        - Write to ROM
+Super Mario Advance 3        - WRITE TO ROM ERROR!
 
-Super Mario Advance 4        - Unimplemented Write Address 0x06018000
+Super Mario Advance 4        - Stuck in Loop!
 
 Super Mario Golf             - Unimplemented MISC Instruction (Showing Nintendo Logo?)
 
-Mario Party Advance          - Unknown Read Address 0xFE100000
+Mario Party Advance          - Unknown Write Addr 0x0!
 
 Mario Pinball Land           - Unknown Write Address 0x208
 
-Mario VS DK                  - Unknown Write Address 0x7000400
+Mario VS DK                  - Thumb Long Branch With Link Error!
 
 Mario Kart Super Circuit     - Unimplemented MISC Instruction
 
-Pokemon Emerald              - Unknown Read Address 0xFE100000
+Pokemon Emerald              - Stuck Writing to Unimplemented I/O Reg
 
-Pokemon Fire Red             - Unknown Read Address 0xFE100000
+Pokemon Fire Red             - Stuck Writing to Unimplemented I/O Reg
 
 Sonic Advance 1              - Unimplemented Multiply 0x4. (Used Incorrect Jump?)
 
@@ -41,13 +45,13 @@ Sonic Advance 2              - Unimplemented Multiply 0x4. (Used Incorrect Jump?
 
 Sonic Advance 3              - Stuck in loop with WARN 0xD?
 
-Sonic Battle                 - Unimplemented Write Address 0x5000402
+Sonic Battle                 - WRITE TO ROM ERROR!
 
-Sonic Genesis                - Write to Rom
+Sonic Genesis                - WRITE TO ROM ERROR!
 
 Sonic Pinball Party  (VENOM) - Unimplemented OP XXXX000 then 0x6!
 
-Sonic Pinball Party          - Unimplemented Shifter Opernand B25: 0 and B6tB4: 0x1
+Sonic Pinball Party          - Shows Graphics.
 
 Tetris Worlds                - Write to ROM
 
@@ -55,22 +59,20 @@ The Legend of Z: LTTP(Mode 7)- In loop
 
 The Legend of Z: LTTP        - Unknown Write Address 0x208
 
-The Legend of Zelda: Minish  - Unknown Read Address 0xFE100000
+The Legend of Zelda: Minish  - Unknown Shifter Opernand B25: 0 and B6tB4: 0x4
 
 Most Common Error Codes:
-8: UNIMPLEMENTED 010001 THUMB OPCODE
-7 + 1/6: Invalid Write Address
-6: Waiting for Interrupts
-1/2: Stuck in infinite loop
+15 + 1/6: Invalid Read/Write Address
+3 + 3/6: Stuck in Loop
 
 
 Armwrestler:     - Shows Grapics, can use input in menu.  Tests don't work due to incomplete cpu.
-    Test 1: Unimplemented Type of move2 0x1
+    Test 1: Unimplemented Shifter opernand B25: 0 and B6tB4: 0x6
     Test 2: Unimplemented shiftOP mode 0x1
     Test 3: Write to ROM
-    Test 4: Stuck in Infinite Loop
-    Test 5: Stuck in Infinite Loop
-    Test 6: Stuck in Infinite Loop
+    Test 4: FAIL, Finished Successfully
+    Test 5: PASS, Finished Successfully
+    Test 6: PASS, Finished Successfully
 
 Aging.gba                    - Write to ROM
 Hello.gba                    - Unknown Read Address 0xFE100000
@@ -84,3 +86,6 @@ doesn't seem to have mattered though
 00000B4E: R4 was set to 80000.  Carry flag got set.  no$gba says otherwise
 doesn't seem to have mattered though
 00000BA4: Compared 0 to r12 containing 400.  C flag was not set.  no$gba says otherwise
+
+line 500
+

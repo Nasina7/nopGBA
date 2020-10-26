@@ -43,17 +43,17 @@ int main()
         }
         if(gbaREG.rNUM[15] == 0x134)
         {
-            breakpoint = true;
+            //breakpoint = true;
         }
-        if(gbaREG.rNUM[15] == 0x08007312)
-        {
-            breakpoint = true;
+        if(gbaREG.rNUM[15] == 0x080008DC)
+        {//24665
+            //breakpoint = true;
         }
-        if(opcodesRan == 29131)
+        if(opcodesRan == 35200)
         {
             //breakpoint = true;
         }
-        if(gbaREG.rNUM[15] == 0x0814F404)
+        if(gbaRAM.onChipWRAM[0x565] == 0x17)
         {
             //breakpoint = true;
         }
@@ -61,10 +61,14 @@ int main()
         {
             //breakpoint = true;
         }
-        if(opcodesRan % 13000 == 0)
+        if(opcodesRan % opcodesPerFrame == 0)
         {
             printf("lcdControl: 0x%X\n",gbaREG.lcdControl);
             //basicRenderMode4();
+            if(updateReadPal == true)
+            {
+                updateReadPalF();
+            }
             handleRendering();
             handleSDLcontrol();
         }

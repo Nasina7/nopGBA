@@ -34,6 +34,9 @@ class nGBARAM
         uint8_t SaveRAM[0x10000];
         // 0E010000 - FFFFFFFF UNUSED
 };
+uint8_t readablePalRam[3][0x20][0x10];  // RGB COLOR, ROW, COLLUM
+uint8_t readablePalRam2[3][0x10];  // RGB COLOR, ROW, COLLUM
+bool updateReadPal;
 class nGBACPU
 {
     public:
@@ -60,6 +63,8 @@ class nGBACPU
         bool HALTCNT;
         bool currentlyHalted;
         uint16_t IE;
+        uint32_t bgCNT[4];
+        uint32_t soundBias;
 };
 bool breakpoint;
 uint32_t currentOpcode;
@@ -233,6 +238,15 @@ uint32_t getASRbyIMM()
     endRotate = ASLvaluebyNum(gbaREG.rNUM[opRM],shiftIMM);
     return endRotate;
 }
+uint32_t LSL(uint32_t value, uint8_t shiftAmount)
+{
+    while(shiftAmount != 0)
+    {
+        value = value << 1;
+        shiftAmount--;
+    }
+    return value;
+}
 uint16_t return16;
 uint32_t return32;
 uint8_t fix1;
@@ -244,14 +258,26 @@ std::bitset<16> IntReg;
 std::bitset<16> IntVal;
 uint8_t IntCountW;
 uint16_t location16;
+int location2;
 uint32_t readMem(int readMode, int location)
 {
+    location2 = location;
+    switch(readMode)
+    {
+        case 1:
+            location = location & 0xFFFFFFFE;
+        break;
+
+        case 2:
+            location = location & 0xFFFFFFFC;
+        break;
+    }
     switch(location)
     {
     case 0x0000 ... 0x4000:
         if(readMode == 0)
         {
-            return gbaRAM.biosRAM[location];
+            fix1 = gbaRAM.biosRAM[location];
         }
         if(readMode == 1)
         {
@@ -259,8 +285,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.biosRAM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -272,8 +296,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -281,7 +303,7 @@ uint32_t readMem(int readMode, int location)
         location -= 0x02000000;
         if(readMode == 0)
         {
-            return gbaRAM.onBoardWRAM[location];
+            fix1 = gbaRAM.onBoardWRAM[location];
         }
         if(readMode == 1)
         {
@@ -289,8 +311,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.onBoardWRAM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -302,8 +322,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -311,7 +329,7 @@ uint32_t readMem(int readMode, int location)
         location -= 0x03000000;
         if(readMode == 0)
         {
-            return gbaRAM.onChipWRAM[location];
+            fix1 = gbaRAM.onChipWRAM[location];
         }
         if(readMode == 1)
         {
@@ -319,8 +337,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.onChipWRAM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -332,8 +348,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -341,7 +355,7 @@ uint32_t readMem(int readMode, int location)
         location = location & 0x7FFF;
         if(readMode == 0)
         {
-            return gbaRAM.onChipWRAM[location];
+            fix1 = gbaRAM.onChipWRAM[location];
         }
         if(readMode == 1)
         {
@@ -349,8 +363,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.onChipWRAM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -362,8 +374,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -385,12 +395,21 @@ uint32_t readMem(int readMode, int location)
                 return gbaREG.LY;
             break;
 
+            case 0x04000088:
+                return gbaREG.soundBias;
+            break;
+
             case 0x040000BA:
                 return gbaREG.dmaControl0.to_ulong();
             break;
 
             case 0x040000DE:
                 return gbaREG.dmaControl3.to_ulong();
+            break;
+
+            case 0x04000104:
+                printf("TIMER1STUB!\n");
+                return 0;
             break;
 
             case 0x04000130:
@@ -408,7 +427,7 @@ uint32_t readMem(int readMode, int location)
         location -= 0x05000000;
         if(readMode == 0)
         {
-            return gbaRAM.Bg_ObjPalRam[location];
+            fix1 = gbaRAM.Bg_ObjPalRam[location];
         }
         if(readMode == 1)
         {
@@ -416,8 +435,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.Bg_ObjPalRam[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -429,8 +446,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -438,7 +453,7 @@ uint32_t readMem(int readMode, int location)
         location -= 0x06000000;
         if(readMode == 0)
         {
-            return gbaRAM.VideoRAM[location];
+            fix1 = gbaRAM.VideoRAM[location];
         }
         if(readMode == 1)
         {
@@ -446,8 +461,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.VideoRAM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -459,8 +472,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -468,7 +479,7 @@ uint32_t readMem(int readMode, int location)
         location -= 0x06000000;
         if(readMode == 0)
         {
-            return gbaRAM.ObjectRAM[location];
+            fix1 = gbaRAM.ObjectRAM[location];
         }
         if(readMode == 1)
         {
@@ -476,8 +487,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.ObjectRAM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -489,8 +498,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -498,7 +505,7 @@ uint32_t readMem(int readMode, int location)
         location -= 0x08000000;
         if(readMode == 0)
         {
-            return gbaRAM.flashROM[location];
+            fix1 = gbaRAM.flashROM[location];
         }
         if(readMode == 1)
         {
@@ -506,8 +513,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.flashROM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -519,8 +524,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -528,7 +531,7 @@ uint32_t readMem(int readMode, int location)
         location -= 0x0E000000;
         if(readMode == 0)
         {
-            return gbaRAM.SaveRAM[location];
+            fix1 = gbaRAM.SaveRAM[location];
         }
         if(readMode == 1)
         {
@@ -536,8 +539,6 @@ uint32_t readMem(int readMode, int location)
                        gbaRAM.SaveRAM[location + 1];
             fix1 = return16 >> 8;
             fix2 = return16;
-            return16 = fix2 << 8 | fix1;
-            return return16;
         }
         if(readMode == 2)
         {
@@ -549,8 +550,6 @@ uint32_t readMem(int readMode, int location)
             fix2 = return32 >> 16;
             fix3 = return32 >> 8;
             fix4 = return32;
-            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
-            return return32;
         }
     break;
 
@@ -560,11 +559,68 @@ uint32_t readMem(int readMode, int location)
         return 0;
     break;
     }
+    location = location2;
+    switch(readMode)
+    {
+        case 0:
+            fix4 = 0;
+            fix3 = 0;
+            fix2 = 0;
+            return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
+            return return32;
+        break;
+
+        case 1:
+            fix4 = 0;
+            fix3 = 0;
+            switch(location & 0x1)
+            {
+                case 0:
+                    return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
+                    return return32;
+                break;
+
+                case 1:
+                    return32 = fix4 << 24 | fix3 << 16 | fix1 << 8 | fix2;
+                    return return32;
+                break;
+            }
+        break;
+
+        case 2:
+            switch(location & 0x3)
+            {
+                case 0:
+                    return32 = fix4 << 24 | fix3 << 16 | fix2 << 8 | fix1;
+                    return return32;
+                break;
+
+                case 1:
+                    return32 = fix1 << 24 | fix4 << 16 | fix3 << 8 | fix2;
+                    return return32;
+                break;
+
+                case 2:
+                    return32 = fix2 << 24 | fix1 << 16 | fix4 << 8 | fix3;
+                    return return32;
+                break;
+
+                case 3:
+                    return32 = fix3 << 24 | fix2 << 16 | fix1 << 8 | fix4;
+                    return return32;
+                break;
+            }
+        break;
+    }
 }
 std::bitset<24> getLowerBits;
 uint32_t trueLocation;
 void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
 {
+    if(location >= 0x06000000 && value != 0x00)
+    {
+        //breakpoint = true;
+    }
     switch(location)
     {
         case 0x02000000 ... 0x0203FFFF:
@@ -655,6 +711,28 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
                     gbaREG.lcdControl = value;
                 break;
 
+                case 0x04000008:
+                    breakpoint = true;
+                    printf("VAL: 0x%X\n",value);
+                    gbaREG.bgCNT[0] = value;
+                break;
+
+                case 0x0400000A:
+                    gbaREG.bgCNT[1] = value;
+                break;
+
+                case 0x0400000C:
+                    gbaREG.bgCNT[2] = value;
+                break;
+
+                case 0x0400000E:
+                    gbaREG.bgCNT[3] = value;
+                break;
+
+                case 0x04000088:
+                    gbaREG.soundBias = value;
+                break;
+
                 case 0x040000B0:
                     gbaREG.dmaStartAddress[0] = value;
                 break;
@@ -742,7 +820,12 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
             }
         break;
 
+        case 0x04000410:
+            printf("I/O REG WITH NO PURPOSE 04000410!\n");
+        break;
+
         case 0x05000000 ... 0x050003FF:
+            updateReadPal = true;
             location -= 0x05000000;
             if(writeMode == 0)
             {
@@ -826,7 +909,8 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
 
         case 0x08000000 ... 0x0DFFFFFF:
             printf("WRITE TO ROM!  THIS SHOULDN'T HAPPEN!\n");
-            opcodeError = true;
+            breakpoint = true;
+            //opcodeError = true;
         break;
 
         case 0x0E000000 ... 0x0E00FFFF:
@@ -838,12 +922,22 @@ void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
             if(writeMode == 1)
             {
                 printf("INVALID WRITE AMOUNT FOR SRAM!\n");
-                opcodeError = true;
+                fix1 = value >> 8;
+                fix2 = value;
+                gbaRAM.SaveRAM[location + 1] = fix1;
+                gbaRAM.SaveRAM[location] = fix2;
             }
             if(writeMode == 2)
             {
                 printf("INVALID WRITE AMOUNT FOR SRAM!\n");
-                opcodeError = true;
+                fix1 = value >> 24;
+                fix2 = value >> 16;
+                fix3 = value >> 8;
+                fix4 = value;
+                gbaRAM.SaveRAM[location + 3] = fix1;
+                gbaRAM.SaveRAM[location + 2] = fix2;
+                gbaRAM.SaveRAM[location + 1] = fix3;
+                gbaRAM.SaveRAM[location] = fix4;
             }
         break;
 
@@ -963,6 +1057,12 @@ int initFunc()
 }
 
 GLuint screenTexGL;
+GLuint palTexGL;
+GLuint tiles1TexGL;
+GLuint BG0TexGL;
+GLuint BG1TexGL;
+GLuint BG2TexGL;
+GLuint BG3TexGL;
 std::string fileNamePath;
 const char* romName;
 int romSize;
@@ -973,6 +1073,8 @@ bool displayREGView;
 bool displayCPSRView;
 bool displayExtraView;
 bool displayBreakpointView;
+bool displayDisplayView;
+bool displayDisplayView2;
 bool displayIntRegs;
 bool displayBIOSRam;
 bool displayOBRam;
@@ -982,9 +1084,15 @@ bool displayVRAM;
 bool displayOBJRAM;
 bool displayROM;
 bool displaysaveRAM;
+bool displayTiles1;
+bool swapPal;
+bool displayBG0;
+bool displayBG1;
+bool displayBG2;
 
 bool breakpointEnabled;
 uint32_t breakpointLocation;
+uint32_t opcodesPerFrame = 30000;
 
 bool sFlag;
 bool zFlag;
@@ -996,7 +1104,10 @@ bool thumbMode;
 bool stateBit;
 uint8_t curMode;
 std::bitset<5> curModeBit;
-
+uint32_t screenBG0Texture[248][248];
+uint32_t screenBG1Texture[248][248];
+uint32_t screenBG2Texture[248][248];
+uint32_t screenBG3Texture[248][248];
 void handleDebugWindow()
 {
     ImGui_ImplOpenGL3_NewFrame();
@@ -1006,6 +1117,38 @@ void handleDebugWindow()
     ImGui::Begin("Screen");
     ImGui::Image((void*)(intptr_t)screenTexGL,ImVec2(240,160));
     ImGui::End();
+
+    if(displayBG0 == true)
+    {
+        glBindTexture(GL_TEXTURE_2D, BG0TexGL);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG0Texture);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        ImGui::Begin("BG0");
+        ImGui::Image((void*)(intptr_t)BG0TexGL,ImVec2(248,248));
+        ImGui::End();
+
+    }
+
+    if(displayBG1 == true)
+    {
+        glBindTexture(GL_TEXTURE_2D, BG1TexGL);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG1Texture);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        ImGui::Begin("BG1");
+        ImGui::Image((void*)(intptr_t)BG1TexGL,ImVec2(248,248));
+        ImGui::End();
+    }
+
+    if(displayBG2 == true)
+    {
+        glBindTexture(GL_TEXTURE_2D, BG2TexGL);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG2Texture);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        ImGui::Begin("BG2");
+        ImGui::Image((void*)(intptr_t)BG2TexGL,ImVec2(248,248));
+        ImGui::End();
+    }
+
 
     ImGui::Begin("Options");
     if(ImGui::Button("Open ROM File"))
@@ -1049,17 +1192,45 @@ void handleDebugWindow()
     {
         resetEMU();
     }
-    if(ImGui::Button("Boot BIOS"))
+    if(ImGui::Button("Boot Bios"))
     {
         resetEMU();
+        gbaREG.rNUM[15] = 0;
+        gbaREG.rNUM[14] = 0;
     }
     ImGui::Checkbox("Display RAM Viewer",&displayRAMView);
     ImGui::Checkbox("Display Register Viewer",&displayREGView);
+    ImGui::Checkbox("Display Debug Screen Menu",&displayDisplayView2);
     ImGui::Checkbox("Display CPSR",&displayCPSRView);
     ImGui::Checkbox("Display Interrupt Register Viewer",&displayIntRegs);
     ImGui::Checkbox("Display Extra Values",&displayExtraView);
     ImGui::Checkbox("Display Breakpoint Options",&displayBreakpointView);
     ImGui::End();
+    if(displayDisplayView2 == true)
+    {
+        ImGui::Begin("Display Options");
+        ImGui::Checkbox("Display Pallete Viewer",&displayDisplayView);
+        ImGui::Checkbox("Display Tiles 1 Viewer",&displayTiles1);
+        ImGui::Checkbox("Display Background 0 Viewer",&displayBG0);
+        ImGui::Checkbox("Display Background 1 Viewer",&displayBG1);
+        ImGui::Checkbox("Display Background 2 Viewer",&displayBG2);
+        ImGui::InputScalar("Opcodes Per Frame:", ImGuiDataType_U32, &opcodesPerFrame, NULL, NULL, "%i", ImGuiInputTextFlags_CharsDecimal);
+        ImGui::InputScalar("BG0:", ImGuiDataType_U32, &gbaREG.bgCNT[0], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::End();
+        if(displayDisplayView == true)
+        {
+            ImGui::Begin("Pal");
+            ImGui::Image((void*)(intptr_t)palTexGL,ImVec2(0x1E,0x1E * 2));
+            ImGui::End();
+        }
+        if(displayTiles1 == true)
+        {
+            ImGui::Begin("Tiles1");
+            ImGui::Checkbox("Swap to Default Pallete",&swapPal);
+            ImGui::Image((void*)(intptr_t)tiles1TexGL,ImVec2(0x3E0,0x3E0));
+            ImGui::End();
+        }
+    }
     if(displayREGView == true)
     {
         ImGui::Begin("Registers");
@@ -1226,7 +1397,27 @@ void handleDebugWindow()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     SDL_GL_SwapWindow(debugScreen);
 }
-
+// Readable Pal Ram Update Func
+void updateReadPalF()
+{
+    updateReadPal = false;
+    uint8_t pRow, pCol;
+    uint32_t palReadLocate;
+    pRow = 0;
+    pCol = 0;
+    while (pRow != 0x10)
+    {
+        while(pCol != 0x10)
+        {
+            palReadLocate = (pRow * 0x20) + (pCol * 0x2);
+            readablePalRam[0][pRow][pCol] = ((readMem(1, 0x05000000 + palReadLocate ) & 0x1F) << 3);
+            readablePalRam[1][pRow][pCol] = (((readMem(1, 0x05000000 + palReadLocate ) >> 5) & 0x1F) << 3);
+            readablePalRam[2][pRow][pCol] = (((readMem(1, 0x05000000 + palReadLocate ) >> 10) & 0x1F) << 3);
+            pCol++;
+        }
+        pRow++;
+    }
+}
 int handleMainGUI()
 {
     handleDebugWindow();

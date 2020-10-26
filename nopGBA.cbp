@@ -30,6 +30,7 @@
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
+			<Add option="-g" />
 			<Add option="-fexceptions" />
 		</Compiler>
 		<Linker>
@@ -52,10 +53,6 @@
 		<Unit filename="input.hpp" />
 		<Unit filename="main.cpp" />
 		<Unit filename="rendering.hpp" />
-		<Extensions>
-			<envvars />
-			<code_completion />
-			<debugger />
-		</Extensions>
+		<Extensions />
 	</Project>
 </CodeBlocks_project_file>
