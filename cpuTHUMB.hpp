@@ -28,6 +28,8 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
         5 = Rotate Right
         6 = Logical Shift Left
         7 = Multiply
+        8 = ?
+        9 = SBC
     */
     switch(operation)
     {
@@ -65,11 +67,26 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
             if(result64 > 0xFFFFFFFF)
             {
                 gbaREG.cpsr[29] = 1;
+                break;
             }
             if(result64 <= 0xFFFFFFFF)
             {
                 gbaREG.cpsr[29] = 0;
+                break;
             }
+            //if(gbaREG.cpsr[5] == 1)
+            //{
+            //    break;
+            //}
+            //result64 = original + valueUsed;
+            //if(result64 >= 0x100000000)
+            //{
+            //    gbaREG.cpsr[29] = 1;
+            //}
+            //if(result64 < 0x100000000)
+            //{
+            //    gbaREG.cpsr[29] = 0;
+            //}
             //gbaREG.cpsr[29] = 0;
             //if(result < original)
             //{
@@ -112,7 +129,7 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
         break;
 
         case 4:
-            checkLSRFlag = ( original >> valueUsed - 1) & 0x1;
+            checkLSRFlag = ( original >> (valueUsed - 1)) & 0x1;
             gbaREG.cpsr[29] = checkLSRFlag;
         break;
 
@@ -169,6 +186,11 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
                 gbaREG.cpsr[29] = 0;
             }
             */
+        break;
+
+        case 8:
+            checkLSRFlag = ASLvaluebyNum(original, valueUsed - 1) & 0x1;
+            gbaREG.cpsr[29] = checkLSRFlag;
         break;
 
         default:
@@ -695,6 +717,7 @@ void thumbOP001SUB()
 }
 void thumbOP001ADD()
 {
+    //breakpoint = true;
     immed82 = currentThumbOpcode;
     offset8Immed = immed82.to_ulong();
     opRDET3B = currentThumbOpcode >> 8;
@@ -765,6 +788,7 @@ void thumbOP001strORldr()
         offset5u = offset5u << 2;
     }
     addValforSTRorLDR = gbaREG.rNUM[opRB] + offset5u;
+
     //printf("ADDVALSTR: 0x%X\n",addValforSTRorLDR);
     if(op16bit[12] == 0 && op16bit[11] == 0)
     {
@@ -855,6 +879,7 @@ void thumbMovLSR()
 int32_t ASRtemp;
 void thumbMovASR()
 {
+    //breakpoint = true;
     opRDET3B = currentThumbOpcode;
     opRD = opRDET3B.to_ulong();
     opRDET3B = currentThumbOpcode >> 3;
@@ -863,12 +888,17 @@ void thumbMovASR()
     thumboffset5 = thumbOffset5B.to_ulong();
     ZOriginal = gbaREG.rNUM[opRD];
     ASRtemp = ZOriginal;
+    if(thumboffset5 == 0x0)
+    {
+        thumboffset5 = 0x20;
+    }
     ASRtemp = ASLvaluebyNum(ASRtemp,thumboffset5);
+    //printf("ASRTMP: 0x%X\n",thumboffset5);
     gbaREG.rNUM[opRD] = ASRtemp;
 
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
-    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],4,thumboffset5);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],8,thumboffset5);
 
     gbaREG.rNUM[15] += 2;
     //breakpoint = true;

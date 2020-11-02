@@ -1,9 +1,7 @@
-Games Showing Graphics:
-Sonic Pinball Party
-
 Games potentially showing graphics:
 Mario Golf (Mode 0)
 Kirby Nightmare in Dreamland (Mode 0?)
+Sonic Pinball Party
 
 Kirby and the Amazing Mirror - Thumb Long Branch With Link Error!
 
@@ -66,10 +64,10 @@ Most Common Error Codes:
 3 + 3/6: Stuck in Loop
 
 
-Armwrestler:     - Shows Grapics, can use input in menu.  Tests don't work due to incomplete cpu.
-    Test 1: Unimplemented Shifter opernand B25: 0 and B6tB4: 0x6
+Armwrestler:     - Shows Grapics, can use input in menu.
+    Test 1: FAIL, Finished Successfully
     Test 2: Unimplemented shiftOP mode 0x1
-    Test 3: Write to ROM
+    Test 3: FAIL, Finished Successfully
     Test 4: FAIL, Finished Successfully
     Test 5: PASS, Finished Successfully
     Test 6: PASS, Finished Successfully

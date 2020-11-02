@@ -35,30 +35,11 @@ int main()
         opcodesRan++;
         handleDMA();
         checkModeSwitch();
+        handleBreakpoint();
         //printf("R15: 0x%X\n",gbaREG.rNUM[15]);
         //breakpoint = true;
-        if(gbaREG.rNUM[15] == breakpointLocation && breakpointEnabled == true)
-        {
-            breakpoint = true;
-        }
-        if(gbaREG.rNUM[15] == 0x134)
-        {
-            //breakpoint = true;
-        }
-        if(gbaREG.rNUM[15] == 0x080008DC)
+        if(gbaREG.rNUM[15] == 0x08000C90)
         {//24665
-            //breakpoint = true;
-        }
-        if(opcodesRan == 35200)
-        {
-            //breakpoint = true;
-        }
-        if(gbaRAM.onChipWRAM[0x565] == 0x17)
-        {
-            //breakpoint = true;
-        }
-        if(gbaREG.R1314_svc[0] == 0x03007FC0)
-        {
             //breakpoint = true;
         }
         if(opcodesRan % opcodesPerFrame == 0)
@@ -73,7 +54,7 @@ int main()
             handleSDLcontrol();
         }
         //std::cout<<"CPSR: "<<gbaREG.cpsr<<std::endl;
-        if(breakpoint == true)
+        if(breakpoint == true && 0 == 1)
         {
             printRegs();
             allowRun = false;

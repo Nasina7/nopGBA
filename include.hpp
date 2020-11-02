@@ -132,6 +132,18 @@ void memDump()
 }
 std::bitset<1> backupBit2;
 std::bitset<32> rotateValNeed;
+uint32_t onesCompilment(uint32_t value)
+{
+    rotateValNeed = value;
+    uint32_t oneFixC = 31;
+    while(oneFixC != 0xFFFFFFFF)
+    {
+        if(rotateValNeed[oneFixC] == 0)
+        {
+
+        }
+    }
+}
 uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
 {
     rotateValNeed = valueNeed;
@@ -185,6 +197,10 @@ bool iBit;
 bool bBit;
 bool sBit;
 // END
+const char* breakpointSettings[] = {"Equal To", "Less Than", "Less Than or Equal To", "Greater Than", "Greater Than or Equal To"};
+static const char* breakpointCurrent = NULL;
+bool breakpointEnabled;
+uint32_t breakpointLocation;
 std::bitset<32> ASLShift;
 bool signValue;
 uint32_t ASLvaluebyNum(uint32_t value2, uint8_t shiftAmount)
@@ -202,13 +218,19 @@ uint32_t ASLvaluebyNum(uint32_t value2, uint8_t shiftAmount)
 uint32_t endRotate;
 uint8_t shiftIMM;
 std::bitset<5> shiftIMM2;
+bool shiftOut;
 uint32_t getLSLbyIMM()
 {
     opRDET = currentOpcode;
     opRM = opRDET.to_ulong();
     shiftIMM2 = currentOpcode >> 7;
     shiftIMM = shiftIMM2.to_ulong();
+    if(shiftIMM == 0x0)
+    {
+        shiftIMM = 0x20;
+    }
     endRotate = gbaREG.rNUM[opRM] << shiftIMM;
+    shiftOut = ((gbaREG.rNUM[opRM] << (shiftIMM - 1)) & 0x80000000);
     return endRotate;
 }
 uint32_t getLSRbyIMM()
@@ -217,7 +239,12 @@ uint32_t getLSRbyIMM()
     opRM = opRDET.to_ulong();
     shiftIMM2 = currentOpcode >> 7;
     shiftIMM = shiftIMM2.to_ulong();
+    if(shiftIMM == 0x0)
+    {
+        shiftIMM = 0x20;
+    }
     endRotate = gbaREG.rNUM[opRM] >> shiftIMM;
+    shiftOut = ((gbaREG.rNUM[opRM] >> (shiftIMM - 1)) & 0x1);
     return endRotate;
 }
 uint32_t getRRbyIMM()
@@ -226,7 +253,12 @@ uint32_t getRRbyIMM()
     opRM = opRDET.to_ulong();
     shiftIMM2 = currentOpcode >> 7;
     shiftIMM = shiftIMM2.to_ulong();
+    if(shiftIMM == 0x0)
+    {
+        shiftIMM = 0x20;
+    }
     endRotate = rotateValue32(true,shiftIMM,gbaREG.rNUM[opRM]);
+    shiftOut = (rotateValue32(true,shiftIMM - 1,gbaREG.rNUM[opRM]) & 0x1);
     return endRotate;
 }
 uint32_t getASRbyIMM()
@@ -235,7 +267,12 @@ uint32_t getASRbyIMM()
     opRM = opRDET.to_ulong();
     shiftIMM2 = currentOpcode >> 7;
     shiftIMM = shiftIMM2.to_ulong();
+    if(shiftIMM == 0x0)
+    {
+        shiftIMM = 0x20;
+    }
     endRotate = ASLvaluebyNum(gbaREG.rNUM[opRM],shiftIMM);
+    shiftOut = (ASLvaluebyNum(gbaREG.rNUM[opRM],shiftIMM - 1) & 0x1);
     return endRotate;
 }
 uint32_t LSL(uint32_t value, uint8_t shiftAmount)
@@ -615,11 +652,12 @@ uint32_t readMem(int readMode, int location)
 }
 std::bitset<24> getLowerBits;
 uint32_t trueLocation;
-void writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
+int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
 {
-    if(location >= 0x06000000 && value != 0x00)
+    if(location < 0x4000)
     {
-        //breakpoint = true;
+        printf("noWriteBIOS!\n");
+        return 0;
     }
     switch(location)
     {
@@ -1023,6 +1061,39 @@ void resetEMU()
             dontDisplayError = true;
 }
 
+bool breakpointOpcodeA;
+uint32_t opcodeRanBreak;
+int handleBreakpoint()
+{
+    if(opcodeRanBreak == opcodesRan && breakpointOpcodeA == true)
+    {
+        breakpoint = true;
+    }
+    if(breakpointEnabled != true)
+    {
+        return 0;
+    }
+    if(gbaREG.rNUM[15] == breakpointLocation && breakpointCurrent == "Equal To")
+    {
+        breakpoint = true;
+    }
+    if(gbaREG.rNUM[15] < breakpointLocation && breakpointCurrent == "Less Than")
+    {
+        breakpoint = true;
+    }
+    if(gbaREG.rNUM[15] <= breakpointLocation && breakpointCurrent == "Less Than or Equal To")
+    {
+        breakpoint = true;
+    }
+    if(gbaREG.rNUM[15] > breakpointLocation && breakpointCurrent == "Greater Than")
+    {
+        breakpoint = true;
+    }
+    if(gbaREG.rNUM[15] >= breakpointLocation && breakpointCurrent == "Greater Than or Equal To")
+    {
+        breakpoint = true;
+    }
+}
 // Some Dear ImGUI Stuff
 const char* glsl_version = "#version 130";
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -1089,10 +1160,8 @@ bool swapPal;
 bool displayBG0;
 bool displayBG1;
 bool displayBG2;
-
-bool breakpointEnabled;
-uint32_t breakpointLocation;
 uint32_t opcodesPerFrame = 30000;
+
 
 bool sFlag;
 bool zFlag;
@@ -1194,6 +1263,20 @@ void handleDebugWindow()
     }
     if(ImGui::Button("Boot Bios"))
     {
+        FILE* bios = fopen("bios/gba.rom","r");
+            if(bios == NULL)
+            {
+                printf("WARNING!  BIOS NOT DETECTED! GAMES WILL LIKELY NOT WORK!\nBios must go into bios/gba.rom!\n");
+                fclose(bios);
+            }
+            if(bios != NULL)
+            {
+                fseek (bios , 0 , SEEK_END);
+                romSize = ftell(bios);
+                rewind(bios);
+                fread(gbaRAM.biosRAM,romSize,1,bios);
+                fclose(bios);
+            }
         resetEMU();
         gbaREG.rNUM[15] = 0;
         gbaREG.rNUM[14] = 0;
@@ -1358,7 +1441,25 @@ void handleDebugWindow()
     {
         ImGui::Begin("Breakpoint Settings");
         ImGui::Checkbox("Enabled",&breakpointEnabled);
+        if(ImGui::BeginCombo("Combo", breakpointCurrent))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(breakpointSettings); n++)
+            {
+                bool breakpointIsSelect = (breakpointCurrent == breakpointSettings[n]);
+                if(ImGui::Selectable(breakpointSettings[n], breakpointIsSelect))
+                {
+                    breakpointCurrent = breakpointSettings[n];
+                }
+                if(breakpointIsSelect)
+                {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
         ImGui::InputScalar("PC Location:", ImGuiDataType_U32, &breakpointLocation, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::Checkbox("2nd Enabled",&breakpointOpcodeA);
+        ImGui::InputScalar("Opcodes Ran:", ImGuiDataType_U32, &opcodeRanBreak, NULL, NULL, "%i", ImGuiInputTextFlags_CharsDecimal);
         ImGui::End();
     }
     if(opcodeError == true && dontDisplayError == false)

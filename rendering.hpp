@@ -381,14 +381,7 @@ void basicTiles1Render()
             {
                 while(xPosT != 8)
                 {
-                    if(xPosT != 0x7)
-                    {
-                        currentByteRender = tileData >> (28 - ((xPosT) * 4));
-                    }
-                    if(xPosT == 0x7)
-                    {
-                        currentByteRender = tileData;
-                    }
+                    currentByteRender = tileData >> (28 - ((xPosT) * 4));
                     if(swapPal == false)
                     {
                         tiles1Texture[yPosT2][xPosT2] = 0xFF << 24 |
