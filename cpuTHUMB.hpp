@@ -29,7 +29,7 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
         6 = Logical Shift Left
         7 = Multiply
         8 = ?
-        9 = SBC
+        9 = Auto Set 1
     */
     switch(operation)
     {
@@ -193,6 +193,10 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
             gbaREG.cpsr[29] = checkLSRFlag;
         break;
 
+        case 9:
+            gbaREG.cpsr[29] = 1;
+        break;
+
         default:
             printf("Unimplemented Carry Flag Operation!\n");
             opcodeError = true;
@@ -201,7 +205,8 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
 }
 int64_t result64T;
 int32_t result32T;
-void handleOverflowFlag(int32_t original, int32_t result, uint8_t operation, int32_t valueUsed)
+std::bitset<1> overflowTest;
+int handleOverflowFlag(int32_t original, int32_t result, uint8_t operation, int32_t valueUsed)
 {
     /*
         Operation Values
@@ -226,9 +231,9 @@ void handleOverflowFlag(int32_t original, int32_t result, uint8_t operation, int
         break;
 
         case 2:
-            result64T = original + valueUsed;
+            result32T = original + valueUsed;
             gbaREG.cpsr[28] = 0;
-            if(original > 0 && result64T < 0)
+            if(original >= 0 && result32T < 0)
             {
                 gbaREG.cpsr[28] = 1;
             }
@@ -238,16 +243,21 @@ void handleOverflowFlag(int32_t original, int32_t result, uint8_t operation, int
             result32T = original;
             result32T -= valueUsed;
             gbaREG.cpsr[28] = 0;
+            if(original < 0 && result32T >= 0)
+            {
+                gbaREG.cpsr[28] = 1;
+            }
             /*
             if(result64T < -2147483648)
             {
                 gbaREG.cpsr[28] = 1;
             }
             */
-            if(result32T > original)
-            {
-                gbaREG.cpsr[28] = 1;
-            }
+
+            //if(result32T > original)
+            //{
+                //gbaREG.cpsr[28] = 1;
+            //}
             //gbaREG.cpsr[28] = 0;
             //if(result > original)
             //{
@@ -631,21 +641,25 @@ void thumbOPADDorSUB()
     {
         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS] + gbaREG.rNUM[opRN];
         handleCarryFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],2,gbaREG.rNUM[opRN]);
+        handleOverflowFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],2,gbaREG.rNUM[opRN]);
     }
     if(op16bit[10] == 1 && op16bit[9] == 0)
     {
         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS] + opRN;
         handleCarryFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],2,opRN);
+        handleOverflowFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],2,opRN);
     }
     if(op16bit[10] == 0 && op16bit[9] == 1)
     {
         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS] - gbaREG.rNUM[opRN];
         handleCarryFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],3,gbaREG.rNUM[opRN]);
+        handleOverflowFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],3,gbaREG.rNUM[opRN]);
     }
     if(op16bit[10] == 1 && op16bit[9] == 1)
     {
         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS] - opRN;
         handleCarryFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],3,opRN);
+        handleOverflowFlag(gbaREG.rNUM[opRS], gbaREG.rNUM[opRD],3,opRN);
     }
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
@@ -712,6 +726,7 @@ void thumbOP001SUB()
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
     handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],3,offset8Immed);
+    handleOverflowFlag(ZOriginal,gbaREG.rNUM[opRD],3,offset8Immed);
     gbaREG.rNUM[15] += 2;
     //breakpoint = true;
 }
@@ -1026,6 +1041,7 @@ void thumbOP010000CMN()
     handleSignFlag(cmpResultThumb);
     handleZeroFlag(gbaREG.rNUM[opRD],cmpResultThumb);
     handleCarryFlag(gbaREG.rNUM[opRD],cmpResultThumb,2,gbaREG.rNUM[opRS]);
+    handleOverflowFlag(gbaREG.rNUM[opRD],cmpResultThumb,2,gbaREG.rNUM[opRS]);
     gbaREG.rNUM[15] += 2;
 }
 bool signVal;
@@ -1151,7 +1167,22 @@ void thumbOPSBC()
     gbaREG.rNUM[opRD] = (gbaREG.rNUM[opRD] - gbaREG.rNUM[opRS]) - gbaREG.cpsr[29];
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
-    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],3,gbaREG.rNUM[opRS]);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],3,gbaREG.rNUM[opRS] + gbaREG.cpsr[29]);
+    handleOverflowFlag(ZOriginal,gbaREG.rNUM[opRD],3,gbaREG.rNUM[opRS] + gbaREG.cpsr[29]);
+    gbaREG.rNUM[15] += 2;
+}
+void thumbOPADC()
+{
+    opRDET3B = currentThumbOpcode;
+    opRD = opRDET3B.to_ulong();
+    opRDET3B = currentThumbOpcode >> 3;
+    opRS = opRDET3B.to_ulong();
+    ZOriginal = gbaREG.rNUM[opRD];
+    gbaREG.rNUM[opRD] = (gbaREG.rNUM[opRD] + gbaREG.rNUM[opRS]) + gbaREG.cpsr[29];
+    handleSignFlag(gbaREG.rNUM[opRD]);
+    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],2,gbaREG.rNUM[opRS] + gbaREG.cpsr[29]);
+    handleOverflowFlag(ZOriginal,gbaREG.rNUM[opRD],2,gbaREG.rNUM[opRS] + gbaREG.cpsr[29]);
     gbaREG.rNUM[15] += 2;
 }
 void thumbOPROR()
@@ -1190,7 +1221,7 @@ void thumbOPOR()
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] | gbaREG.rNUM[opRS];
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
-    handleCarryFlag(0,0,1,0);
+    handleCarryFlag(0,0,9,0);
     gbaREG.rNUM[15] += 2;
 }
 void thumbOPEOR()
@@ -1466,6 +1497,10 @@ void doThumbOpcode(uint16_t opcode)
 
                                                         case 0x4:
                                                             thumbOPASR();
+                                                        break;
+
+                                                        case 0x5:
+                                                            thumbOPADC();
                                                         break;
 
                                                         case 0x6:

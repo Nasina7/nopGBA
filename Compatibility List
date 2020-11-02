@@ -33,9 +33,23 @@ Mario VS DK                  - Thumb Long Branch With Link Error!
 
 Mario Kart Super Circuit     - Unimplemented MISC Instruction
 
-Pokemon Emerald              - Stuck Writing to Unimplemented I/O Reg
+Mother 1 + 2                 - Stuck In BIOS
 
-Pokemon Fire Red             - Stuck Writing to Unimplemented I/O Reg
+Mother 3                     - Stuck at 0x348
+
+One Piece                    - Unimplemented Shifter Opernand B25: 0 and B6tB4: 0x7
+
+Pokemon Emerald              - Stuck in BIOS
+
+Pokemon Fire Red             - Stuck in BIOS
+
+Pokemon Mystery Dungeon (Red)- Unknown Read Address
+
+Pokemon Ruby                 - Stuck in BIOS
+
+Pokemon Sapphire             - Stuck in BIOS
+
+Pokemon Pinball (Intro)      - ?
 
 Sonic Advance 1              - Unimplemented Multiply 0x4. (Used Incorrect Jump?)
 
@@ -43,7 +57,7 @@ Sonic Advance 2              - Unimplemented Multiply 0x4. (Used Incorrect Jump?
 
 Sonic Advance 3              - Stuck in loop with WARN 0xD?
 
-Sonic Battle                 - WRITE TO ROM ERROR!
+Sonic Battle                 - Unimplemented Condition 0xF!
 
 Sonic Genesis                - WRITE TO ROM ERROR!
 
@@ -55,9 +69,15 @@ Tetris Worlds                - Write to ROM
 
 The Legend of Z: LTTP(Mode 7)- In loop
 
-The Legend of Z: LTTP        - Unknown Write Address 0x208
+The Legend of Z: LTTP        - Unimplemented Condition 0xF!
 
-The Legend of Zelda: Minish  - Unknown Shifter Opernand B25: 0 and B6tB4: 0x4
+The Legend of Zelda: Minish  - Unimplemented OP XXXX110END!
+
+Wario Land 4                 - Unimplemented Condition 0xF!
+
+Wario Ware Inc (Intro)       - ?
+
+Wario Ware Twisted           - Stuck Enabling DMA2
 
 Most Common Error Codes:
 15 + 1/6: Invalid Read/Write Address
@@ -77,6 +97,7 @@ Hello.gba                    - Unknown Read Address 0xFE100000
 CPUTest.gba                  - Infinite Loop
 thumb.gba                    - Unknown Read Address 0xFF00
 badapple.gba                 - Stuck in loop reading from timers
+Suite.gba                    - Unimplemented 010000 Thumb Opcode 0x5!
 
 Bios issues:
 00000158: R11 anded with 1f, put in r11, was set to zero.  Z flag was set, but no&gba didnt set

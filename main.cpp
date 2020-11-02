@@ -54,7 +54,7 @@ int main()
             handleSDLcontrol();
         }
         //std::cout<<"CPSR: "<<gbaREG.cpsr<<std::endl;
-        if(breakpoint == true && 0 == 1)
+        if(breakpoint == true)
         {
             printRegs();
             allowRun = false;

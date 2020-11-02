@@ -460,6 +460,11 @@ uint32_t readMem(int readMode, int location)
         }
     break;
 
+    case 0x04000801 ... 0x04FFFFFF:
+            printf("Open Bus?\n");
+            return 0;
+    break;
+
     case 0x05000000 ... 0x050003FF:
         location -= 0x05000000;
         if(readMode == 0)
@@ -652,6 +657,7 @@ uint32_t readMem(int readMode, int location)
 }
 std::bitset<24> getLowerBits;
 uint32_t trueLocation;
+bool test170;
 int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
 {
     if(location < 0x4000)
@@ -862,6 +868,10 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
             printf("I/O REG WITH NO PURPOSE 04000410!\n");
         break;
 
+        case 0x04000801 ... 0x04FFFFFF:
+            printf("Open Bus?\n");
+        break;
+
         case 0x05000000 ... 0x050003FF:
             updateReadPal = true;
             location -= 0x05000000;
@@ -947,7 +957,7 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
 
         case 0x08000000 ... 0x0DFFFFFF:
             printf("WRITE TO ROM!  THIS SHOULDN'T HAPPEN!\n");
-            breakpoint = true;
+            //breakpoint = true;
             //opcodeError = true;
         break;
 
@@ -1059,6 +1069,9 @@ void resetEMU()
             allowRun = true;
             opcodeError = false;
             dontDisplayError = true;
+            gbaREG.currentlyHalted = false;
+            gbaREG.IME = false;
+            gbaREG.IE = 0;
 }
 
 bool breakpointOpcodeA;

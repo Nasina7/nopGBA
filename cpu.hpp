@@ -258,7 +258,23 @@ void handleDMA()
     }
     if(gbaREG.dmaControl2[15] == 1)
     {
-        printf("DMA 2 WAS ENABLED!\n");
+        //printf("DMA 3 WAS ENABLED!\n");
+        startAddrDMA = gbaREG.dmaStartAddress[2];
+        endAddrDMA = gbaREG.dmaEndAddress[2];
+        wordCountDMA = gbaREG.dmaWordCount[2];
+        //printf("WORD: 0x%X\n",wordCountDMA);
+        dmaControl = gbaREG.dmaControl2.to_ulong();
+        if(gbaREG.dmaControl2[13] == 0 && gbaREG.dmaControl2[12] == 0 && wordCountDMA != 0)
+        {
+            // Immediately
+            doDMATransfer();
+            gbaREG.dmaControl2[15] = 0;
+        }
+        if(gbaREG.dmaControl2[13] != 0 || gbaREG.dmaControl2[12] != 0)
+        {
+            doDMATransfer();
+            gbaREG.dmaControl2[15] = 0;
+        }
     }
     if(gbaREG.dmaControl3[15] == 1)
     {
@@ -824,6 +840,7 @@ uint8_t conditionCodeS;
 uint8_t shiftOP;
 std::bitset<2> shiftOPB;
 uint32_t shiftReg;
+std::bitset<32> shiftOPfix;
 int loadStoreOp()
 {
     op32bit = currentOpcode;
@@ -915,6 +932,7 @@ int loadStoreOp()
 
             case 0x3: // Immediate Pre Indexed
                 //printf("case3\n");
+                //breakpoint = true;
                 if(uBit == 1)
                 {
                     offset_12B = currentOpcode;
@@ -931,7 +949,7 @@ int loadStoreOp()
                     }
                     if(opRN != 0xF)
                     {
-                        gbaREG.rNUM[opRN] = writeReadAddress + offset_12;
+                        gbaREG.rNUM[opRN] = writeReadAddress;
                     }
                 }
                 if(uBit == 0)
@@ -950,7 +968,7 @@ int loadStoreOp()
                     }
                     if(opRN != 0xF)
                     {
-                        gbaREG.rNUM[opRN] = writeReadAddress - offset_12;
+                        gbaREG.rNUM[opRN] = writeReadAddress;
                     }
                 }
             break;
@@ -1098,14 +1116,47 @@ int loadStoreOp()
                     switch(shiftOP)
                     {
                         case 0x0:
-                            shiftReg = shiftReg << shiftIMM;
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = shiftReg << shiftIMM;
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = shiftReg << 0x20;
+                            }
+                        break;
+
+                        case 0x1:
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = shiftReg >> shiftIMM;
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = shiftReg >> 0x20;
+                            }
+                        break;
+
+                        case 0x2:
+
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = ASLvaluebyNum(shiftReg,shiftIMM);
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = ASLvaluebyNum(shiftReg,0x20);
+                            }
                         break;
 
                         case 0x3:
                             if(shiftIMM == 0)
                             {
-                                printf("Unimplemented shiftOP mode RRX\n");
-                                opcodeError = true;
+                                shiftReg = shiftReg >> 1;
+                                shiftOPfix = shiftReg;
+                                shiftOPfix[31] = gbaREG.cpsr[29];
+                                shiftReg = shiftOPfix.to_ulong();
+
                             }
                             if(shiftIMM != 0)
                             {
@@ -1314,10 +1365,8 @@ void addOP()
             //printf("Shift Result: 0x%X\n",shifterResult);
         break;
     }
-    ZOriginal = gbaREG.rNUM[opRD];
+    ZOriginal = gbaREG.rNUM[opRN];
     //gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] + shifterResult;
-    //printf("OPRN: 0x%X\n",opRN);
-    //printf("OPRD: 0x%X\n",opRD);
     if(doFlagUpdate == true)
     {
         handleCarryFlag(ZOriginal,gbaREG.rNUM[opRN] + shifterResult,2,shifterResult);
@@ -2540,7 +2589,7 @@ void opTST()
         B32Bit = immed8VAL;
         gbaREG.cpsr[29] = B32Bit[31];
         ZOriginal = gbaREG.rNUM[opRD];
-        printf("IMMED8VAL: 0x%X\n",immed8VAL);
+        //printf("IMMED8VAL: 0x%X\n",immed8VAL);
         //printf("RS: 0x%X\n",opRN);
         //printf("RD: 0x%X\n",opRD);
         cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
@@ -2561,7 +2610,7 @@ void opTST()
                         B32Bit = immed8VAL;
                         gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
-                        printf("IMMED8VAL: 0x%X\n",immed8VAL);
+                        //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
                         //printf("RD: 0x%X\n",opRD);
                         cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
@@ -2572,7 +2621,7 @@ void opTST()
                         B32Bit = immed8VAL;
                         gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
-                        printf("IMMED8VAL: 0x%X\n",immed8VAL);
+                        //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
                         //printf("RD: 0x%X\n",opRD);
                         cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
@@ -3096,7 +3145,7 @@ void opLoadStoreMultiple()
     {
         printf("SBIT IS ENABLED!  COULD CAUSE BUGS!\n");
     }
-    if(uBit == 1) // R15 to R0
+    if(uBit == 0) // R15 to R0
     {
         regUseOther = gbaREG.rNUM[opRN];
         loopRegList = 0xF;
@@ -3106,7 +3155,7 @@ void opLoadStoreMultiple()
             {
                 if(pBit == 1)
                 {
-                    regUseOther += 4;
+                    regUseOther -= 4;
                 }
                 if(lBit == 1)
                 {
@@ -3122,7 +3171,7 @@ void opLoadStoreMultiple()
                 }
                 if(pBit == 0)
                 {
-                    regUseOther += 4;
+                    regUseOther -= 4;
                 }
             }
             loopRegList -= 1;
@@ -3137,7 +3186,7 @@ void opLoadStoreMultiple()
             gbaREG.rNUM[opRN] = regUseOther;
         }
     }
-    if(uBit == 0) // R0 to R15
+    if(uBit == 1) // R0 to R15
     {
         regUseOther = gbaREG.rNUM[opRN];
         loopRegList = 0x0;
@@ -3147,7 +3196,7 @@ void opLoadStoreMultiple()
             {
                 if(pBit == 1)
                 {
-                    regUseOther -= 4;
+                    regUseOther += 4;
                 }
                 if(lBit == 1)
                 {
@@ -3163,7 +3212,7 @@ void opLoadStoreMultiple()
                 }
                 if(pBit == 0)
                 {
-                    regUseOther -= 4;
+                    regUseOther += 4;
                 }
             }
             loopRegList++;
