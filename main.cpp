@@ -2,12 +2,15 @@
 using namespace std;
 char option;
 uint32_t testPrev;
+uint32_t testPrev2;
+uint32_t test15;
 int main()
 {
     //breakpoint = true;
     initFunc();
-    glGenTextures(1,&screenTexGL);
+    glGenTextures(8,&screenTexGL);
     //SDL_RenderSetScale(mainRenderer,2,2);
+    //printf("test\n");
     gbaREG.rNUM[13] = 0x03007F00;
     gbaREG.rNUM[14] = 0x08000000;
     gbaREG.R1314_svc[0] = 0x03007FD0;
@@ -18,6 +21,7 @@ int main()
     gbaREG.cpsr = 0x1F;
     gbaREG.spsr = 0x10;
     //loadROM();
+    //printf("test\n");
     while(closenopGBA == false)
     {
         while(allowRun == false)
@@ -30,26 +34,37 @@ int main()
         if(gbaREG.currentlyHalted == false)
         {
             doOpcodeMain();
+            test15 = gbaREG.rNUM[15];
+            if(gbaREG.cpsr[5] == 0)
+            {
+                gbaREG.rNUM[15] = gbaREG.rNUM[15] & 0xFFFFFFFC;
+            }
+            if(gbaREG.cpsr[5] == 1)
+            {
+                gbaREG.rNUM[15] = gbaREG.rNUM[15] & 0xFFFFFFFE;
+            }
+            if(test15 != gbaREG.rNUM[15])
+            {
+                printf("BROKEN JUMP PREVENTED!\n");
+                breakpoint = true;
+            }
         }
-        handleInterrupts();
+        if(doInterrupts == true)
+        {
+            handleInterrupts();
+        }
+        //gbaRAM.onChipWRAM[0x1EC4] = 0x00;
         opcodesRan++;
         handleDMA();
         checkModeSwitch();
         handleBreakpoint();
         //printf("R15: 0x%X\n",gbaREG.rNUM[15]);
         //breakpoint = true;
-        if(gbaREG.rNUM[15] == 0x08000C90)
-        {//24665
-            //breakpoint = true;
-        }
         if(opcodesRan % opcodesPerFrame == 0)
         {
-            printf("lcdControl: 0x%X\n",gbaREG.lcdControl);
+            //printf("lcdControl: 0x%X\n",gbaREG.lcdControl);
             //basicRenderMode4();
-            if(updateReadPal == true)
-            {
-                updateReadPalF();
-            }
+            updateReadPalF();
             handleRendering();
             handleSDLcontrol();
         }

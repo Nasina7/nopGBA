@@ -50,6 +50,7 @@ int loadROM()
     rewind(bios);
     fread(gbaRAM.biosRAM,romSize,1,bios);
     fclose(bios);
+    return 0;
 }
 uint32_t startAddrDMA;
 uint32_t endAddrDMA;
@@ -227,6 +228,14 @@ void checkModeSwitch()
                 }
                 prevModeSwitch = 0x1F;
             break;
+
+            default:
+                printf("UNIMPLEMENTED MODE SWITCH 0x%X!\n", currentMode);
+                if(currentMode != 0x10)
+                {
+                    opcodeError = true;
+                }
+            break;
         }
         //printf("Mode Switch to: 0x%X\n",prevModeSwitch);
     }
@@ -249,7 +258,7 @@ void handleDMA()
         }
         if(gbaREG.dmaControl0[13] != 0 || gbaREG.dmaControl0[12] != 0)
         {
-            printf("DMA TIMING IS NOT IMPLEMENTED!\n");
+            //printf("DMA TIMING IS NOT IMPLEMENTED!\n");
         }
     }
     if(gbaREG.dmaControl1[15] == 1)
@@ -292,7 +301,7 @@ void handleDMA()
         }
         if(gbaREG.dmaControl3[13] != 0 || gbaREG.dmaControl3[12] != 0)
         {
-            printf("DMA TIMING IS NOT IMPLEMENTED!\n");
+            //printf("DMA TIMING IS NOT IMPLEMENTED!\n");
         }
     }
 }
@@ -334,6 +343,7 @@ uint8_t movIntoReg;
 void movOP()
 {
     //opcodeError = true;
+    //breakpoint = true;
     rotation8mov = currentOpcode << 24;
     rotation8mov = rotation8mov >> 24;
     rotatebitAmount = currentOpcode >> 8;
@@ -349,18 +359,23 @@ void movOP()
     }
     rotatebitAmount = currentOpcode >> 12; // Using rotate bit amount because it's val doesnt matter and I needed a 4bit bitset anyway
     movIntoReg = rotatebitAmount.to_ulong();
+    ZOriginal = gbaREG.rNUM[movIntoReg];
     gbaREG.rNUM[movIntoReg] = rotation8mov.to_ulong();
     op32bit = currentOpcode;
     if(op32bit[20] == 1)
     {
-        //printf("Handle Flag Stub for 001-1101!\n");
+        handleSignFlag(gbaREG.rNUM[movIntoReg]);
+        handleZeroFlag(ZOriginal, gbaREG.rNUM[movIntoReg]);
     }
     if(rMovAmBack != 0)
     {
         //printf("Does Carry 001-1101 Work?\n");
-        gbaREG.cpsr[29] = rotation8mov[31];
+        gbaREG.cpsr[29] = shiftOut;
     }
-    gbaREG.rNUM[15] += 4;
+    if(movIntoReg != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void movNOTOP()
 {
@@ -380,11 +395,13 @@ void movNOTOP()
     }
     rotatebitAmount = currentOpcode >> 12; // Using rotate bit amount because it's val doesnt matter and I needed a 4bit bitset anyway
     movIntoReg = rotatebitAmount.to_ulong();
+    ZOriginal = gbaREG.rNUM[movIntoReg];
     gbaREG.rNUM[movIntoReg] = ~rotation8mov.to_ulong();
     op32bit = currentOpcode;
     if(op32bit[20] == 1)
     {
-        //printf("Handle Flag Stub for 001-1101!\n");
+        handleSignFlag(gbaREG.rNUM[movIntoReg]);
+        handleZeroFlag(ZOriginal, gbaREG.rNUM[movIntoReg]);
     }
     if(rMovAmBack != 0)
     {
@@ -401,7 +418,7 @@ void movOPREG()
     opRD = opRDET.to_ulong();
     ZOriginal = gbaREG.rNUM[opRD];
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN];
-    if(opRN == 0xF)
+    if(opRN == 0xF && opRD != 0xF)
     {
         gbaREG.rNUM[opRD] += 8;
     }
@@ -460,6 +477,10 @@ void movOPLSLbyImmediate()
     offset5u = offset52.to_ulong();
     shiftBitLSL = gbaREG.rNUM[opRM];
     shiftBitLSL = shiftBitLSL << offset5u;
+    if(offset5u == 0)
+    {
+        shiftBitLSL = 0;
+    }
     gbaREG.rNUM[opRD] = shiftBitLSL;
     if(opRN == 0xF)
     {
@@ -473,11 +494,15 @@ void movOPLSLbyImmediate()
         rotation8mov = gbaREG.rNUM[opRD];
         gbaREG.cpsr[29] = rotation8mov[31];
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 uint8_t low8Shift;
 void movOPLSLbyRegister()
 {
+    //breakpoint = true;
     opRDET = currentOpcode;
     opRM = opRDET.to_ulong();
     opRDET = currentOpcode >> 12;
@@ -492,7 +517,12 @@ void movOPLSLbyRegister()
     //offset52 = currentOpcode >> 7;
     //offset5u = offset52.to_ulong();
     shiftBitLSL = gbaREG.rNUM[opRM];
-    shiftBitLSL = shiftBitLSL << low8Shift;
+    if(opRM == 0xF)
+    {
+        shiftBitLSL += 0xC;
+    }
+    //shiftBitLSL = shiftBitLSL << low8Shift;
+    shiftBitLSL = LSL(shiftBitLSL, low8Shift);
     gbaREG.rNUM[opRD] = shiftBitLSL;
     if(opRN == 0xF)
     {
@@ -504,9 +534,16 @@ void movOPLSLbyRegister()
         handleSignFlag(gbaREG.rNUM[opRD]);
         handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
         rotation8mov = gbaREG.rNUM[opRD];
-        gbaREG.cpsr[29] = rotation8mov[31];
+        if(low8Shift != 0)
+        {
+            gbaREG.cpsr[29] = shiftOut;
+        }
+
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void movOPLSRbyRegister()
 {
@@ -539,7 +576,10 @@ void movOPLSRbyRegister()
         gbaREG.cpsr[29] = rotation8mov[31];
         printf("THIS CARRY FLAG IS INCORRECT!\n");
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void movOPASRbyRegister()
 {
@@ -574,9 +614,53 @@ void movOPASRbyRegister()
     {
         handleSignFlag(gbaREG.rNUM[opRD]);
         handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
-        handleCarryFlag(0,0,1,0);
+        //handleCarryFlag(0,0,1,0);
+        if(low8Shift != 0)
+        {
+            gbaREG.cpsr[29] = ASLvaluebyNum(gbaREG.rNUM[opRM],low8Shift - 1) & 0x1;
+        }
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
+}
+void movOPRORbyRegister()
+{
+    opRDET = currentOpcode;
+    opRM = opRDET.to_ulong();
+    opRDET = currentOpcode >> 12;
+    opRD = opRDET.to_ulong();
+    opRDET = currentOpcode >> 16;
+    opRN = opRDET.to_ulong();
+    opRDET = currentOpcode >> 8;
+    opRS = opRDET.to_ulong();
+    low8Shift = gbaREG.rNUM[opRS];
+
+    ZOriginal = gbaREG.rNUM[opRD];
+    //offset52 = currentOpcode >> 7;
+    //offset5u = offset52.to_ulong();
+    shiftBitLSL = gbaREG.rNUM[opRM];
+    shiftBitLSL = rotateValue32(true, low8Shift, shiftBitLSL);
+    //shiftBitLSL = shiftBitLSL >> low8Shift;
+    gbaREG.rNUM[opRD] = shiftBitLSL;
+    if(opRN == 0xF)
+    {
+        gbaREG.rNUM[opRD] += 8;
+    }
+    op32bit = currentOpcode;
+    if(op32bit[20] == 1)
+    {
+        handleSignFlag(gbaREG.rNUM[opRD]);
+        handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
+        rotation8mov = gbaREG.rNUM[opRD];
+        gbaREG.cpsr[29] = rotation8mov[31];
+        printf("THIS CARRY FLAG IS INCORRECT!\n");
+    }
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void movNOTOPLSLbyImmediate()
 {
@@ -618,7 +702,17 @@ void movOPLSRbyImmediate()
     offset52 = currentOpcode >> 7;
     offset5u = offset52.to_ulong();
     shiftBitLSL = gbaREG.rNUM[opRM];
+    //if(offset5u == 0)
+    //{
+    //    offset5u = 0x20;
+    //}
+    //printf("offset5u: 0x%X\n",offset5u);
     shiftBitLSL = shiftBitLSL >> offset5u;
+    if(offset5u == 0)
+    {
+        shiftBitLSL = 0;
+    }
+    //shiftBitLSL = LSR(shiftBitLSL, offset5u);
     gbaREG.rNUM[opRD] = shiftBitLSL;
     if(opRN == 0xF)
     {
@@ -631,7 +725,10 @@ void movOPLSRbyImmediate()
         handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
         handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],4,offset5u);
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void movOPASRbyImmediate()
 {
@@ -654,6 +751,10 @@ void movOPASRbyImmediate()
     shiftIMM = shiftIMM2.to_ulong();
 
     gbaREG.rNUM[opRD] = ASLvaluebyNum(gbaREG.rNUM[opRM],shiftIMM);
+    if(shiftIMM == 0)
+    {
+        gbaREG.rNUM[opRD] = 0;
+    }
     if(opRN == 0xF)
     {
         gbaREG.rNUM[opRD] += 8;
@@ -665,7 +766,10 @@ void movOPASRbyImmediate()
         handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
         handleCarryFlag(0,0,1,0);
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void movOPRORbyImmediate()
 {
@@ -692,7 +796,10 @@ void movOPRORbyImmediate()
         handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
         handleCarryFlag(0,0,1,0);
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void movNOTOPLSRbyImmediate()
 {
@@ -909,19 +1016,19 @@ int loadStoreOp()
                     offset_12B = currentOpcode;
                     offset_12 = offset_12B.to_ulong();
                     writeReadAddress = gbaREG.rNUM[opRN] + offset_12;
-                    //printf("WRAddress: 0x%X\n",writeReadAddress);
                     if(opRN == 0xF)
                     {
                         writeReadAddress += 8;
                     }
+                    //printf("WRAddress: 0x%X\n",writeReadAddress);
                 }
                 if(uBit == 0)
                 {
                     offset_12B = currentOpcode;
                     offset_12 = offset_12B.to_ulong();
-                    printf("offset_12B: 0x%X\n",offset_12);
+                    //printf("offset_12B: 0x%X\n",offset_12);
                     writeReadAddress = gbaREG.rNUM[opRN] - offset_12;
-                    printf("wrAddress: 0x%X\n",writeReadAddress);
+                    //printf("wrAddress: 0x%X\n",writeReadAddress);
                     //printf("WRAddress: 0x%X\n",writeReadAddress);
                     if(opRN == 0xF)
                     {
@@ -985,12 +1092,14 @@ int loadStoreOp()
         checkFor0forB4tB11u = checkFor0forB4tB11.to_ulong();
         if(checkFor0forB4tB11u == 0) // REGISTER
         {
+            //printf("REG OFF SCALLLEEE???\n");
             switch(PWLSval)
             {
                 case 0x0: // Register Post Indexed
                     //printf("Do apply offset only after?\n");
                     opRDET = currentOpcode;
                     opRM = opRDET.to_ulong();
+                    //printf("REG OFFPI\n");
                     //printf("opRM: 0x%X\n",opRM);
                     //printf("opRN: 0x%X\n",opRN);
                     if(uBit == 1)
@@ -1028,6 +1137,8 @@ int loadStoreOp()
                 break;
 
                 case 0x2: // Register Offset
+                    //breakpoint = true;
+                    //printf("REG OFF\n");
                     opRDET = currentOpcode;
                     opRM = opRDET.to_ulong();
                     if(uBit == 1)
@@ -1057,7 +1168,9 @@ int loadStoreOp()
                 break;
 
                 case 0x3: // Register Pre Indexed
+                    breakpoint = true;
                     //printf("Do apply offset only after?\n");
+                    //printf("REG OFF PRE\n");
                     opRDET = currentOpcode;
                     opRM = opRDET.to_ulong();
                     //printf("opRM: 0x%X\n",opRM);
@@ -1075,7 +1188,7 @@ int loadStoreOp()
                         }
                         if(opRN != 0xF)
                         {
-                            gbaREG.rNUM[opRN] = writeReadAddress + gbaREG.rNUM[opRM];
+                            gbaREG.rNUM[opRN] = gbaREG.rNUM[opRN] + gbaREG.rNUM[opRM];
                         }
                     }
                     if(uBit == 0)
@@ -1091,7 +1204,7 @@ int loadStoreOp()
                         }
                         if(opRN != 0xF)
                         {
-                            gbaREG.rNUM[opRN] = writeReadAddress - gbaREG.rNUM[opRM];
+                            gbaREG.rNUM[opRN] = gbaREG.rNUM[opRN] - gbaREG.rNUM[opRM];
                         }
                     }
                 break;
@@ -1099,9 +1212,209 @@ int loadStoreOp()
         }
         if(checkFor0forB4tB11u != 0) // Scaled Register
         {
+            printf("REG OFF222\n");
             switch(PWLSval)
             {
+                case 0x0: // Scaled Register Post-Indexed
+                    opRDET = currentOpcode;
+                    opRM = opRDET.to_ulong();
+                    opRDET = currentOpcode >> 16;
+                    opRN = opRDET.to_ulong();
+                    shiftOPB = currentOpcode >> 5;
+                    shiftOP = shiftOPB.to_ulong();
+                    shiftReg = gbaREG.rNUM[opRM];
+                    shiftIMM2 = currentOpcode >> 7;
+                    shiftIMM = shiftIMM2.to_ulong();
+                    //printf("opRM: 0x%X\n",opRM);
+                    //printf("opRN: 0x%X\n",opRN);
+                    switch(shiftOP)
+                    {
+                        case 0x0:
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = shiftReg << shiftIMM;
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = shiftReg << 0x20;
+                            }
+                        break;
+
+                        case 0x1:
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = shiftReg >> shiftIMM;
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = shiftReg >> 0x20;
+                            }
+                        break;
+
+                        case 0x2:
+
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = ASLvaluebyNum(shiftReg,shiftIMM);
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = ASLvaluebyNum(shiftReg,0x20);
+                            }
+                        break;
+
+                        case 0x3:
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = shiftReg >> 1;
+                                shiftOPfix = shiftReg;
+                                shiftOPfix[31] = gbaREG.cpsr[29];
+                                shiftReg = shiftOPfix.to_ulong();
+
+                            }
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = rotateValue32(true,shiftIMM,shiftReg);
+                            }
+                        break;
+
+                        default:
+                            printf("Unimplemented shiftOP mode 0x%X\n",shiftOP);
+                            opcodeError = true;
+                        break;
+                    }
+                    if(uBit == 1)
+                    {
+                        writeReadAddress = gbaREG.rNUM[opRN];
+                        if(opRN == 0xF)
+                        {
+                            writeReadAddress += 8;
+                        }
+                        if(opRM == 0xF)
+                        {
+                            writeReadAddress += 8;
+                        }
+                        if(opRN != 0xF)
+                        {
+                            gbaREG.rNUM[opRN] = gbaREG.rNUM[opRN] + shiftReg;
+                        }
+                    }
+                    if(uBit == 0)
+                    {
+                        writeReadAddress = gbaREG.rNUM[opRN];
+                        if(opRN == 0xF)
+                        {
+                            writeReadAddress += 8;
+                        }
+                        if(opRM == 0xF)
+                        {
+                            writeReadAddress -= 8;
+                        }
+                        if(opRN != 0xF)
+                        {
+                            gbaREG.rNUM[opRN] = gbaREG.rNUM[opRN] - shiftReg;
+                        }
+                    }
+                    //printf("W/R Address: 0x%X\n",writeReadAddress);
+                    //opcodeError = true;
+                    //return 0;
+                break;
+
                 case 0x2: // Scaled Register Offset
+                    printf("REG OFFpppp\n");
+                    opRDET = currentOpcode;
+                    opRM = opRDET.to_ulong();
+                    opRDET = currentOpcode >> 16;
+                    opRN = opRDET.to_ulong();
+                    shiftOPB = currentOpcode >> 5;
+                    shiftOP = shiftOPB.to_ulong();
+                    shiftReg = gbaREG.rNUM[opRM];
+                    shiftIMM2 = currentOpcode >> 7;
+                    shiftIMM = shiftIMM2.to_ulong();
+                    //printf("opRM: 0x%X\n",opRM);
+                    //printf("opRN: 0x%X\n",opRN);
+                    switch(shiftOP)
+                    {
+                        case 0x0:
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = shiftReg << shiftIMM;
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = 0;
+                            }
+                        break;
+
+                        case 0x1:
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = shiftReg >> shiftIMM;
+                            }
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = 0;
+                            }
+                        break;
+
+                        case 0x2:
+                            if(shiftIMM == 0)
+                            {
+                                shiftIMM = 0x20;
+                            }
+                            shiftReg = ASLvaluebyNum(shiftReg,shiftIMM);
+                        break;
+
+                        case 0x3:
+                            if(shiftIMM == 0)
+                            {
+                                shiftReg = shiftReg >> 1;
+                                shiftOPfix = shiftReg;
+                                shiftOPfix[31] = gbaREG.cpsr[29];
+                                shiftReg = shiftOPfix.to_ulong();
+
+                            }
+                            if(shiftIMM != 0)
+                            {
+                                shiftReg = rotateValue32(true,shiftIMM,shiftReg);
+                            }
+                        break;
+
+                        default:
+                            printf("Unimplemented shiftOP mode 0x%X\n",shiftOP);
+                            opcodeError = true;
+                        break;
+                    }
+                    if(uBit == 1)
+                    {
+                        writeReadAddress = gbaREG.rNUM[opRN] + shiftReg;
+                        if(opRN == 0xF)
+                        {
+                            writeReadAddress += 8;
+                        }
+                        if(opRM == 0xF)
+                        {
+                            writeReadAddress += 8;
+                        }
+                    }
+                    if(uBit == 0)
+                    {
+                        writeReadAddress = gbaREG.rNUM[opRN] - shiftReg;
+                        if(opRN == 0xF)
+                        {
+                            writeReadAddress += 8;
+                        }
+                        if(opRM == 0xF)
+                        {
+                            writeReadAddress -= 8;
+                        }
+                    }
+                    //printf("W/R Address: 0x%X\n",writeReadAddress);
+                    //opcodeError = true;
+                    //return 0;
+                break;
+
+                case 0x3: // Scaled Register Pre-Indexed
                     opRDET = currentOpcode;
                     opRM = opRDET.to_ulong();
                     opRDET = currentOpcode >> 16;
@@ -1180,6 +1493,10 @@ int loadStoreOp()
                         {
                             writeReadAddress += 8;
                         }
+                        if(opRN != 0xF)
+                        {
+                            gbaREG.rNUM[opRN] = gbaREG.rNUM[opRN] + shiftReg;
+                        }
                     }
                     if(uBit == 0)
                     {
@@ -1191,6 +1508,10 @@ int loadStoreOp()
                         if(opRM == 0xF)
                         {
                             writeReadAddress -= 8;
+                        }
+                        if(opRN != 0xF)
+                        {
+                            gbaREG.rNUM[opRN] = gbaREG.rNUM[opRN] - shiftReg;
                         }
                     }
                     //printf("W/R Address: 0x%X\n",writeReadAddress);
@@ -1213,7 +1534,7 @@ int loadStoreOp()
     *   Register Pre-Indexed:        XXXX0111??1?XXXXXXXX00000000XXXX
     *   Register Post-Indexed:       XXXX0110??0?XXXXXXXX00000000XXXX
     *   Scaled Register Offset:      XXXX0111??0?XXXXXXXXXXXXXXX0XXXX
-        Scaled Register Pre-Indexed: XXXX0111??1?XXXXXXXXXXXXXXX0XXXX
+    *   Scaled Register Pre-Indexed: XXXX0111??1?XXXXXXXXXXXXXXX0XXXX
         Scaled Register Post-Indexed:XXXX0110??0?XXXXXXXXXXXXXXX0XXXX
     */
     opRDET = currentOpcode >> 12;
@@ -1242,7 +1563,10 @@ int loadStoreOp()
             //breakpoint = true;
         }
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
     return 0;
 }
 bool linkBranch;
@@ -1345,7 +1669,15 @@ void addOP()
                 break;
 
                 case 6:
+                getB7tB11 = currentOpcode >> 7;
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    shifterResult = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
                     shifterResult = getRRbyIMM();
+                }
                 break;
 
                 default:
@@ -1383,7 +1715,10 @@ void addOP()
         handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
     }
     //std::cout<<"B25: "<<opRDET[0]<<std::endl;
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 
 void opAND()
@@ -1438,7 +1773,7 @@ void opAND()
                     default:
                         immed8VAL = getLSLbyIMM();
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
                     break;
                 }
@@ -1461,7 +1796,15 @@ void opAND()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                getB7tB11 = currentOpcode >> 7;
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
             break;
 
             default:
@@ -1504,7 +1847,10 @@ void opBIC()
         immed8rotate = currentOpcode >> 8;
         immed8VAL = rotateValue32(true,immed8rotate.to_ulong() * 2,immed8VAL);
         B32Bit = immed8VAL;
-        gbaREG.cpsr[29] = B32Bit[31];
+        if(op32bit[20] == 1)
+        {
+            gbaREG.cpsr[29] = rotateValue32(true,(immed8rotate.to_ulong() * 2) - 1,immed8VAL) & 0x1;
+        }
         ZOriginal = gbaREG.rNUM[opRD];
         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
         //printf("RS: 0x%X\n",opRN);
@@ -1543,7 +1889,10 @@ void opBIC()
                     default:
                         immed8VAL = getLSLbyIMM();
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        if(op32bit[20] == 1)
+                        {
+                            gbaREG.cpsr[29] = shiftOut;
+                        }
                         ZOriginal = gbaREG.rNUM[opRD];
                     break;
                 }
@@ -1566,7 +1915,15 @@ void opBIC()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                getB7tB11 = currentOpcode >> 7;
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
             break;
 
             default:
@@ -1582,18 +1939,25 @@ void opBIC()
         */
     }
     B32Bit = immed8VAL;
-    gbaREG.cpsr[29] = shiftOut;
+    if(op32bit[20] == 1)
+    {
+        gbaREG.cpsr[29] = shiftOut;
+    }
     ZOriginal = gbaREG.rNUM[opRD];
 
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] & ~immed8VAL;
 
-    handleSignFlag(gbaREG.rNUM[opRD]);
-    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    if(op32bit[20] == 1)
+    {
+        handleSignFlag(gbaREG.rNUM[opRD]);
+        handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    }
     gbaREG.rNUM[15] += 4;
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
 void opEOR()
 {
+    //breakpoint = true;
     opRDET = currentOpcode >> 12;
     opRD = opRDET.to_ulong();
     opRDET = currentOpcode >> 16;
@@ -1606,12 +1970,12 @@ void opEOR()
         immed8rotate = currentOpcode >> 8;
         immed8VAL = rotateValue32(true,immed8rotate.to_ulong() * 2,immed8VAL);
         B32Bit = immed8VAL;
-        gbaREG.cpsr[29] = B32Bit[31];
+        if(op32bit[20] == 1)
+        {
+            gbaREG.cpsr[29] = rotateValue32(true,(immed8rotate.to_ulong() * 2) - 1,immed8VAL) & 0x1;
+        }
         ZOriginal = gbaREG.rNUM[opRD];
-        //printf("IMMED8VAL: 0x%X\n",immed8VAL);
-        //printf("RS: 0x%X\n",opRN);
-        //printf("RD: 0x%X\n",opRD);
-        gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] ^ immed8VAL;
+        //gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] ^ immed8VAL;
     }
     if(op32bit[25] == 0)
     {
@@ -1645,7 +2009,7 @@ void opEOR()
                     default:
                         immed8VAL = getLSLbyIMM();
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = shiftOut;
                         ZOriginal = gbaREG.rNUM[opRD];
                     break;
                 }
@@ -1668,7 +2032,15 @@ void opEOR()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                getB7tB11 = currentOpcode >> 7;
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
             break;
 
             default:
@@ -1684,13 +2056,19 @@ void opEOR()
         */
     }
     B32Bit = immed8VAL;
-    gbaREG.cpsr[29] = shiftOut;
+    if(op32bit[20] == 1)
+    {
+        gbaREG.cpsr[29] = shiftOut;
+    }
     ZOriginal = gbaREG.rNUM[opRD];
 
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] ^ immed8VAL;
 
-    handleSignFlag(gbaREG.rNUM[opRD]);
-    handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    if(op32bit[20] == 1)
+    {
+        handleSignFlag(gbaREG.rNUM[opRD]);
+        handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
+    }
     gbaREG.rNUM[15] += 4;
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
@@ -1758,7 +2136,15 @@ void opOR()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                getB7tB11 = currentOpcode >> 7;
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
             break;
 
             default:
@@ -1770,8 +2156,6 @@ void opOR()
         //immed8VAL = immed8valget.to_ulong();
         //immed8rotate = currentOpcode >> 8;
         //immed8VAL = rotateValue32(true,immed8rotate.to_ulong() * 2,immed8VAL);/
-        /*
-        */
     }
     B32Bit = immed8VAL;
     ZOriginal = gbaREG.rNUM[opRD];
@@ -1803,7 +2187,7 @@ void opCMP()
         immed8rotate = currentOpcode >> 8;
         immed8VAL = rotateValue32(true,immed8rotate.to_ulong() * 2,immed8VAL);
         B32Bit = immed8VAL;
-        gbaREG.cpsr[29] = B32Bit[31];
+        //gbaREG.cpsr[29] = B32Bit[31];
         ZOriginal = gbaREG.rNUM[opRD];
         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
         //printf("RS: 0x%X\n",opRN);
@@ -1824,7 +2208,7 @@ void opCMP()
                         opRM = opRDET.to_ulong();
                         immed8VAL = gbaREG.rNUM[opRM];
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
                         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
@@ -1835,7 +2219,7 @@ void opCMP()
                     default:
                         immed8VAL = getLSLbyIMM();
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
                         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
@@ -1852,7 +2236,7 @@ void opCMP()
                 opRS = opRDET.to_ulong();
                 immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] - immed8VAL;
             break;
@@ -1860,7 +2244,7 @@ void opCMP()
             case 2:
                 immed8VAL = getLSRbyIMM();
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] - immed8VAL;
             break;
@@ -1868,15 +2252,25 @@ void opCMP()
             case 4:
                 immed8VAL = getASRbyIMM();
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] = immed8VAL;
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                //immed8VAL = getRRbyIMM();
+
+                getB7tB11 = currentOpcode >> 7;
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = shiftOut;
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] = immed8VAL;
             break;
@@ -1985,9 +2379,18 @@ void opCMN()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                //immed8VAL = getRRbyIMM();
+
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                gbaREG.cpsr[29] = shiftOut;
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] + immed8VAL;
             break;
@@ -2097,7 +2500,14 @@ void opSUB()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 ZOriginal = gbaREG.rNUM[opRD];
             break;
 
@@ -2118,7 +2528,14 @@ void opSUB()
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] - immed8VAL;
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
+    if(opRD == 0xF)
+    {
+        gbaREG.cpsr = gbaREG.spsr.to_ulong();
+    }
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
 void opRSB()
@@ -2208,7 +2625,14 @@ void opRSB()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 ZOriginal = gbaREG.rNUM[opRD];
             break;
 
@@ -2229,7 +2653,11 @@ void opRSB()
     gbaREG.rNUM[opRD] = immed8VAL - gbaREG.rNUM[opRN];
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
+
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
 void opADC()
@@ -2310,7 +2738,14 @@ void opADC()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 ZOriginal = gbaREG.rNUM[opRN];
             break;
 
@@ -2342,7 +2777,10 @@ void opADC()
         handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],2,immed8VAL + gbaREG.cpsr[29]);
         handleOverflowFlag(ZOriginal, ZOriginal + immed8VAL + gbaREG.cpsr[29],2,immed8VAL + gbaREG.cpsr[29]);
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
 
@@ -2423,7 +2861,14 @@ void opSBC()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 ZOriginal = gbaREG.rNUM[opRN];
             break;
 
@@ -2453,7 +2898,10 @@ void opSBC()
         handleOverflowFlag(ZOriginal,(ZOriginal - immed8VAL) - ~gbaREG.cpsr[29],3,immed8VAL + ~gbaREG.cpsr[29]);
     }
 
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
 
@@ -2536,7 +2984,14 @@ void opRSC()
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 ZOriginal = gbaREG.rNUM[opRN];
             break;
 
@@ -2587,7 +3042,7 @@ void opTST()
         immed8rotate2 = immed8rotate2 * 2;
         immed8VAL = rotateValue32(true,immed8rotate2,immed8VAL);
         B32Bit = immed8VAL;
-        gbaREG.cpsr[29] = B32Bit[31];
+        //gbaREG.cpsr[29] = B32Bit[31];
         ZOriginal = gbaREG.rNUM[opRD];
         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
         //printf("RS: 0x%X\n",opRN);
@@ -2608,7 +3063,7 @@ void opTST()
                         opRM = opRDET.to_ulong();
                         immed8VAL = gbaREG.rNUM[opRM];
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
                         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
@@ -2619,7 +3074,7 @@ void opTST()
                     default:
                         immed8VAL = getLSLbyIMM();
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
                         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
@@ -2636,7 +3091,7 @@ void opTST()
                 opRS = opRDET.to_ulong();
                 immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
             break;
@@ -2644,7 +3099,7 @@ void opTST()
             case 2:
                 immed8VAL = getLSRbyIMM();
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
             break;
@@ -2652,15 +3107,22 @@ void opTST()
             case 4:
                 immed8VAL = getASRbyIMM();
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = shiftOut;
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] & immed8VAL;
             break;
@@ -2680,7 +3142,7 @@ void opTST()
     handleSignFlag(cmpValueA);
     handleZeroFlag(ZOriginal,cmpValueA);
     rotation8mov = cmpValueA;
-    gbaREG.cpsr[29] = rotation8mov[31];
+    gbaREG.cpsr[29] = shiftOut;
     gbaREG.rNUM[15] += 4;
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
@@ -2698,7 +3160,7 @@ void opTEQ()
         immed8rotate = currentOpcode >> 8;
         immed8VAL = rotateValue32(true,immed8rotate.to_ulong() * 2,immed8VAL);
         B32Bit = immed8VAL;
-        gbaREG.cpsr[29] = B32Bit[31];
+        //gbaREG.cpsr[29] = B32Bit[31];
         ZOriginal = gbaREG.rNUM[opRD];
         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
         //printf("RS: 0x%X\n",opRN);
@@ -2719,7 +3181,7 @@ void opTEQ()
                         opRM = opRDET.to_ulong();
                         immed8VAL = gbaREG.rNUM[opRM];
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
                         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
@@ -2730,7 +3192,7 @@ void opTEQ()
                     default:
                         immed8VAL = getLSLbyIMM();
                         B32Bit = immed8VAL;
-                        gbaREG.cpsr[29] = B32Bit[31];
+                        //gbaREG.cpsr[29] = B32Bit[31];
                         ZOriginal = gbaREG.rNUM[opRD];
                         //printf("IMMED8VAL: 0x%X\n",immed8VAL);
                         //printf("RS: 0x%X\n",opRN);
@@ -2747,7 +3209,7 @@ void opTEQ()
                 opRS = opRDET.to_ulong();
                 immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] ^ immed8VAL;
             break;
@@ -2755,7 +3217,7 @@ void opTEQ()
             case 2:
                 immed8VAL = getLSRbyIMM();
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] ^ immed8VAL;
             break;
@@ -2763,15 +3225,22 @@ void opTEQ()
             case 4:
                 immed8VAL = getASRbyIMM();
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = B32Bit[31];
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] ^ immed8VAL;
             break;
 
             case 6:
-                immed8VAL = getRRbyIMM();
+                if(getB7tB11.to_ulong() == 0)
+                {
+                    immed8VAL = getRRXbyIMM();
+                }
+                if(getB7tB11.to_ulong() != 0)
+                {
+                    immed8VAL = getRRbyIMM();
+                }
                 B32Bit = immed8VAL;
-                gbaREG.cpsr[29] = B32Bit[31];
+                //gbaREG.cpsr[29] = shiftOut;
                 ZOriginal = gbaREG.rNUM[opRD];
                 cmpValueA = gbaREG.rNUM[opRN] ^ immed8VAL;
             break;
@@ -2791,7 +3260,7 @@ void opTEQ()
     handleSignFlag(cmpValueA);
     handleZeroFlag(ZOriginal,cmpValueA);
     rotation8mov = cmpValueA;
-    gbaREG.cpsr[29] = rotation8mov[31];
+    gbaREG.cpsr[29] = shiftOut;
     gbaREG.rNUM[15] += 4;
     //std::cout<<"B25: "<<op32bit[25]<<std::endl;
 }
@@ -2878,6 +3347,7 @@ void dataProcessingORpsrTransfer(uint32_t opcode)
                         B7tB11 = currentOpcode >> 7;
                         if(B7tB11.to_ulong() == 0)
                         {
+                            //breakpoint = true;
                             movOPREG();
                         }
                         if(B7tB11.to_ulong() != 0)
@@ -2886,6 +3356,7 @@ void dataProcessingORpsrTransfer(uint32_t opcode)
                             switch(bit27t25.to_ulong())
                             {
                                 case 0x0:
+                                    //breakpoint = true;
                                     movOPLSLbyImmediate();
                                 break;
 
@@ -2899,27 +3370,38 @@ void dataProcessingORpsrTransfer(uint32_t opcode)
                     break;
 
                     case 1:
+                        //breakpoint = true;
                         movOPLSLbyRegister();
                     break;
 
                     case 2:
+                        //?
                         movOPLSRbyImmediate();
                     break;
 
                     case 3:
+                        //breakpoint = true;
                         movOPLSRbyRegister();
                     break;
 
                     case 4:
+                        //breakpoint = true;
                         movOPASRbyImmediate();
                     break;
 
                     case 5:
+                        //breakpoint = true;
                         movOPASRbyRegister();
                     break;
 
                     case 6:
+                        //breakpoint = true;
                         movOPRORbyImmediate();
+                    break;
+
+                    case 7:
+                        //breakpoint = true;
+                        movOPRORbyRegister();
                     break;
 
                     default:
@@ -3090,6 +3572,23 @@ void opLoadStoreHalfwordWithOffset()
                 }
             break;
 
+            case 0x3:
+                opRDET = currentOpcode >> 16;
+                opRN = opRDET.to_ulong();
+                offset8ImmedB1 = currentOpcode;
+                offset8ImmedB2 = currentOpcode >> 8;
+                offset8Immed = offset8ImmedB2.to_ulong() << 4 | offset8ImmedB1.to_ulong();
+                if(uBit == true)
+                {
+                    writeReadAddress = gbaREG.rNUM[opRN] + offset8Immed;
+                }
+                if(uBit == false)
+                {
+                    writeReadAddress = gbaREG.rNUM[opRN] - offset8Immed;
+                }
+                gbaREG.rNUM[opRN] = writeReadAddress;
+            break;
+
             default:
                 printf("Unimplemented Immediate Index 0x%X!\n",registerIndexDetermine);
                 opcodeError = true;
@@ -3122,6 +3621,17 @@ void opLoadStoreHalfwordWithOffset()
             gbaREG.rNUM[opRD] = readMem(1,writeReadAddress);
         }
     }
+    if(registerIndexDetermine == 0x03)
+    {
+        if(lBit == 0)
+        {
+            writeMem(1,writeReadAddress,gbaREG.rNUM[opRD]);
+        }
+        if(lBit == 1)
+        {
+            gbaREG.rNUM[opRD] = readMem(1,writeReadAddress);
+        }
+    }
     gbaREG.rNUM[15] += 4;
 }
 std::bitset<16> regListToPushPull;
@@ -3144,6 +3654,7 @@ void opLoadStoreMultiple()
     if(sBit == 1)
     {
         printf("SBIT IS ENABLED!  COULD CAUSE BUGS!\n");
+        breakpoint = true;
     }
     if(uBit == 0) // R15 to R0
     {
@@ -3181,7 +3692,11 @@ void opLoadStoreMultiple()
             }
 
         }
-        if(wBit == 1)
+        if(wBit == 1 && regListToPushPull[opRN] != 1 && lBit == 1)
+        {
+            gbaREG.rNUM[opRN] = regUseOther;
+        }
+        if(wBit == 1 && lBit == 0)
         {
             gbaREG.rNUM[opRN] = regUseOther;
         }
@@ -3221,7 +3736,11 @@ void opLoadStoreMultiple()
                 printf("loopREG: 0x%X\n",loopRegList);
             }
         }
-        if(wBit == 1)
+        if(wBit == 1 && regListToPushPull[opRN] != 1 && lBit == 1)
+        {
+            gbaREG.rNUM[opRN] = regUseOther;
+        }
+        if(wBit == 1 && lBit == 0)
         {
             gbaREG.rNUM[opRN] = regUseOther;
         }
@@ -3399,7 +3918,7 @@ void handleMiscInstructions()
         break;
 
         default:
-            printf("UNIMPLEMENTED MISC INSTRUCTION!\n");
+            printf("UNIMPLEMENTED MISC INSTRUCTION 0x%X!\n",getB7tB4.to_ulong());
             opcodeError = true;
         break;
     }
@@ -3416,14 +3935,30 @@ void armLoadStoreSignByteWRegisterOffset() // These function names are getting k
     if(op32bit[23] == 1)
     {
         loadAddress = gbaREG.rNUM[opRN] + gbaREG.rNUM[opRM];
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress += 8;
+        }
     }
     if(op32bit[23] == 0)
     {
         loadAddress = gbaREG.rNUM[opRN] - gbaREG.rNUM[opRM];
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress -= 8;
+        }
     }
     opRDET = currentOpcode >> 12;
     opRD = opRDET.to_ulong();
-    printf("PC OFFSET NOT DONE YET!\n");
+    //printf("PC OFFSET NOT DONE YET!\n");
     switch(op32bit[20])
     {
         case 0: // Store
@@ -3438,7 +3973,68 @@ void armLoadStoreSignByteWRegisterOffset() // These function names are getting k
             gbaREG.rNUM[opRD] = signExtend2;
         break;
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
+}
+void armLoadStoreSignByteWImmediateOffset() // These function names are getting kinda long.
+{
+    op32bit = currentOpcode;
+
+    opRDET = currentOpcode;
+    opRM = opRDET.to_ulong();
+    opRDET = currentOpcode >> 8;
+    opRS = opRDET.to_ulong();
+    opRS = opRS << 8 | opRM;
+
+    opRDET = currentOpcode >> 16;
+    opRN = opRDET.to_ulong();
+    if(op32bit[23] == 1)
+    {
+        loadAddress = gbaREG.rNUM[opRN] + opRS;
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress += 8;
+        }
+    }
+    if(op32bit[23] == 0)
+    {
+        loadAddress = gbaREG.rNUM[opRN] - opRS;
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress -= 8;
+        }
+    }
+    opRDET = currentOpcode >> 12;
+    opRD = opRDET.to_ulong();
+    //printf("PC OFFSET NOT DONE YET!\n");
+    switch(op32bit[20])
+    {
+        case 0: // Store
+            signExtend2 = gbaREG.rNUM[opRD];
+            signExtend2 = (signExtend2 << 24) >> 24;
+            writeMem(0,loadAddress,signExtend2);
+        break;
+
+        case 1: // Load
+            signExtend2 = readMem(0,loadAddress);
+            signExtend2 = (signExtend2 << 24) >> 24;
+            gbaREG.rNUM[opRD] = signExtend2;
+        break;
+    }
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void armLoadStoreSignHalfWordWRegisterOffset()
 {
@@ -3450,14 +4046,30 @@ void armLoadStoreSignHalfWordWRegisterOffset()
     if(op32bit[23] == 1)
     {
         loadAddress = gbaREG.rNUM[opRN] + gbaREG.rNUM[opRM];
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress += 8;
+        }
     }
     if(op32bit[23] == 0)
     {
         loadAddress = gbaREG.rNUM[opRN] - gbaREG.rNUM[opRM];
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress -= 8;
+        }
     }
     opRDET = currentOpcode >> 12;
     opRD = opRDET.to_ulong();
-    printf("PC OFFSET NOT DONE YET!\n");
+    //printf("PC OFFSET NOT DONE YET!\n");
     switch(op32bit[20])
     {
         case 0: // Store
@@ -3472,7 +4084,68 @@ void armLoadStoreSignHalfWordWRegisterOffset()
             gbaREG.rNUM[opRD] = signExtend2;
         break;
     }
-    gbaREG.rNUM[15] += 4;
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
+}
+void armLoadStoreSignHalfWordWImmediateOffset()
+{
+    op32bit = currentOpcode;
+
+    opRDET = currentOpcode;
+    opRM = opRDET.to_ulong();
+    opRDET = currentOpcode >> 8;
+    opRS = opRDET.to_ulong();
+    opRS = opRS << 8 | opRM;
+
+    opRDET = currentOpcode >> 16;
+    opRN = opRDET.to_ulong();
+    if(op32bit[23] == 1)
+    {
+        loadAddress = gbaREG.rNUM[opRN] + opRS;
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress += 8;
+        }
+    }
+    if(op32bit[23] == 0)
+    {
+        loadAddress = gbaREG.rNUM[opRN] - opRS;
+        if(opRN == 0xF)
+        {
+            loadAddress += 8;
+        }
+        if(opRM == 0xF)
+        {
+            loadAddress -= 8;
+        }
+    }
+    opRDET = currentOpcode >> 12;
+    opRD = opRDET.to_ulong();
+    //printf("PC OFFSET NOT DONE YET!\n");
+    switch(op32bit[20])
+    {
+        case 0: // Store
+            signExtend2 = gbaREG.rNUM[opRD];
+            signExtend2 = (signExtend2 << 16) >> 16;
+            writeMem(1,loadAddress,signExtend2);
+        break;
+
+        case 1: // Load
+            signExtend2 = readMem(1,loadAddress);
+            signExtend2 = (signExtend2 << 16) >> 16;
+            gbaREG.rNUM[opRD] = signExtend2;
+        break;
+    }
+    if(opRD != 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 void handleMultiplyandExtra()
 {
@@ -3514,9 +4187,22 @@ void handleMultiplyandExtra()
                         break;
 
                         case 1:
-                            armLoadStoreSignHalfWordWRegisterOffset();
+                            armLoadStoreSignByteWImmediateOffset();
                         break;
                     }
+                break;
+            }
+        break;
+
+        case 0xF:
+            switch(op32bit[22])
+            {
+                case 0:
+                    armLoadStoreSignHalfWordWRegisterOffset();
+                break;
+
+                case 1:
+                    armLoadStoreSignHalfWordWImmediateOffset();
                 break;
             }
         break;
@@ -3550,18 +4236,18 @@ int findAndDoOpcode(uint32_t opcode)
 {
     // This will likely become a mess, but in the interest of just getting the CPU working, i'm going to use it until it works.
     // This code looks awful, but it's a lot better than the last implementation.
-    bitOpcode = opcode;
-    currentOpcodeBit = opcode >> 27;
+    //bitOpcode = opcode;
+    //currentOpcodeBit = opcode >> 27;
     //std::cout<<currentOpcodeBit<<std::endl;
-    switch(currentOpcodeBit[0])
+    switch(opcode & 0x8000000)
     {
         case 0: // 0
-            currentOpcodeBit = opcode >> 26;
-            switch(currentOpcodeBit[0])
+            //currentOpcodeBit = opcode >> 26;
+            switch(opcode & 0x4000000)
             {
                 case 0: // 00
-                    currentOpcodeBit = opcode >> 25;
-                    switch(currentOpcodeBit[0])
+                    //currentOpcodeBit = opcode >> 25;
+                    switch(opcode & 0x2000000)
                     {
                         case 0: // 000
                             //currentOpcodeBit = currentOpcode >> 24;
@@ -3597,48 +4283,48 @@ int findAndDoOpcode(uint32_t opcode)
                             opcodeError = true;
                         break;
 
-                        case 1: // XXXX001
+                        case 0x2000000: // XXXX001
                             dataProcessingORpsrTransfer(opcode);
                         break;
                     }
                 break;
 
-                case 1: // XXXX01
+                case 0x4000000: // 01
                     loadStoreOp();
                 break;
             }
         break;
 
-        case 1:
+        case 0x8000000: // 1
             currentOpcodeBit = opcode >> 26;
-            switch(currentOpcodeBit[0])
+            switch(opcode & 0x4000000)
             {
                 case 0:
                     currentOpcodeBit = opcode >> 25;
-                    switch(currentOpcodeBit[0])
+                    switch(opcode & 0x2000000)
                     {
                         case 0:
                             opLoadStoreMultiple();
                         break;
 
-                        case 1:
+                        case 0x2000000:
                             branchOp(); // XXX101END
                         break;
                     }
                 break;
 
-                case 1:
-                    currentOpcodeBit = opcode >> 25;
-                    switch(currentOpcodeBit[0])
+                case 0x4000000:
+                    //currentOpcodeBit = opcode >> 25;
+                    switch(opcode & 0x2000000)
                     {
                         case 0:
                             printf("UNIMPLEMENTED OP XXXX110END!\n");
                             opcodeError = true;
                         break;
 
-                        case 1:
-                            currentOpcodeBit = opcode >> 24;
-                            switch(currentOpcodeBit[0])
+                        case 0x2000000:
+                            //currentOpcodeBit = opcode >> 24;
+                            switch(opcode & 0x1000000)
                             {
                                 case 0:
                                     printf("UNIMPLEMENTED OP XXXX1110END!\n");
@@ -3657,6 +4343,7 @@ int findAndDoOpcode(uint32_t opcode)
             }
         break;
     }
+    return 0;
 }
 int doOpcode(uint32_t opcode)
 {
@@ -3838,6 +4525,7 @@ int doOpcode(uint32_t opcode)
             opcodeError = true;
         break;
     }
+    return 0;
 }
 
 int doOpcodeMain()
@@ -3876,35 +4564,67 @@ int doOpcodeMain()
         doThumbOpcode(currentThumbOpcode);
         return 0;
     }
+    return 0;
 
 }
 std::bitset<16> checkIE;
+std::bitset<16> checkIF;
 uint8_t IEcount;
 bool endWhile;
 uint8_t IEfix;
 void handleInterrupts()
 {
-    if(gbaREG.IME == true && gbaREG.currentlyHalted == true)
+    if(opcodesRan % 2500000 == 0 && opcodesRan != 0)
+    {
+        gbaREG.IF = gbaREG.IF | 0x1;
+    }
+    if(gbaREG.IME == true)
     {
         checkIE = gbaREG.IE;
+        checkIF = gbaREG.IF;
         IEcount = 0;
         endWhile = false;
         IEcount = 0xFF;
         while(IEcount != 16)
         {
-            if(checkIE[IEcount] == 1)
+            if(checkIE[IEcount] == 1 && checkIF[IEcount] == 1)
             {
                 endWhile = true;
-                checkIE[IEcount] = 0;
-                gbaREG.IE = checkIE.to_ulong();
+                //checkIE[IEcount] = 0;
+                //gbaREG.IE = checkIE.to_ulong();
                 goto endWhileIE; // Yeah, this is bad i know.  everything about this interrupt routine is bad.
             }
             IEcount++;
         }
+        endWhile = false;
         endWhileIE:
+        if(endWhile == true && gbaREG.IME == true && gbaREG.cpsr[7] == 0)
+        {
+            printf("Doing Hardware Interrupt 0x%X!\n",IEcount);
+            //gbaREG.R1314_irq[1] = gbaREG.rNUM[15] + 4;
+            gbaREG.R1314_irq[1] = gbaREG.rNUM[15] + 4;
+            printf("R13irq: 0x%X\n",gbaREG.R1314_irq[0]);
+            printf("R14irq: 0x%X\n",gbaREG.R1314_irq[1]);
+            gbaREG.spsr_irq = gbaREG.cpsr.to_ulong();
+            gbaREG.rNUM[15] = 0x18;
+            gbaREG.cpsr[7] = 1;
+            gbaREG.cpsr[5] = 0;
+            gbaREG.cpsr[4] = 1;
+            gbaREG.cpsr[3] = 0;
+            gbaREG.cpsr[2] = 0;
+            gbaREG.cpsr[1] = 1;
+            gbaREG.cpsr[0] = 0;
+            //gbaREG.IF -= 1; // This area of code only happens if B1 of IF is set, so subtracting one will work for clearing the bit.
+
+            //breakpoint = true;
+            //printf("Are we supposed to swap to SVC?\n");
+            gbaREG.currentlyHalted = false;
+            //breakpoint = true;
+        }
+        /*
         if(endWhile == true)
         {
-
+            //endWhileIE = false;
             switch(IEcount)
             {
                 default: // This is heavily stubbed right now, but whatever.  I just want games to run right now.  I'll fix it later.
@@ -3927,5 +4647,6 @@ void handleInterrupts()
                 break;
             }
         }
+        */
     }
 }

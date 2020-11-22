@@ -63,11 +63,14 @@ class nGBACPU
         bool HALTCNT;
         bool currentlyHalted;
         uint16_t IE;
+        uint16_t IF;
         uint32_t bgCNT[4];
         uint32_t soundBias;
 };
+bool shiftOut;
 bool breakpoint;
 uint32_t currentOpcode;
+uint8_t currentDispMode;
 uint16_t currentThumbOpcode;
 bool opcodeError;
 std::bitset<32> op32bit;
@@ -143,6 +146,7 @@ uint32_t onesCompilment(uint32_t value)
 
         }
     }
+    return 0;
 }
 uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
 {
@@ -156,6 +160,7 @@ uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
         while(rotateTimes != 0x0)
         {
             backupBit2[0] = rotateValNeed[0];
+            shiftOut = backupBit2[0];
             rotateValNeed = rotateValNeed >> 1;
             rotateValNeed[31] = backupBit2[0];
             rotateTimes--;
@@ -170,6 +175,7 @@ uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
         while(rotateTimes != 0x0)
         {
             backupBit2[0] = rotateValNeed[31];
+            shiftOut = backupBit2[0];
             rotateValNeed = rotateValNeed << 1;
             rotateValNeed[0] = backupBit2[0];
             rotateTimes--;
@@ -177,7 +183,16 @@ uint32_t rotateValue32(bool goRight, uint8_t rotateTimes, uint32_t valueNeed)
     }
     return rotateValNeed.to_ulong();
 }
+uint32_t rotateXValue32(uint32_t valueNeed)
+{
+    rotateValNeed = valueNeed;
 
+    backupBit2[0] = rotateValNeed[0];
+    rotateValNeed = rotateValNeed >> 1;
+    rotateValNeed[31] = gbaREG.cpsr[29];
+
+    return rotateValNeed.to_ulong();
+}
 // From CPU.hpp
 uint8_t opRD;
 uint8_t opRN;
@@ -218,7 +233,6 @@ uint32_t ASLvaluebyNum(uint32_t value2, uint8_t shiftAmount)
 uint32_t endRotate;
 uint8_t shiftIMM;
 std::bitset<5> shiftIMM2;
-bool shiftOut;
 uint32_t getLSLbyIMM()
 {
     opRDET = currentOpcode;
@@ -261,6 +275,14 @@ uint32_t getRRbyIMM()
     shiftOut = (rotateValue32(true,shiftIMM - 1,gbaREG.rNUM[opRM]) & 0x1);
     return endRotate;
 }
+uint32_t getRRXbyIMM()
+{
+    opRDET = currentOpcode;
+    opRM = opRDET.to_ulong();
+    endRotate = rotateXValue32(gbaREG.rNUM[opRM]);
+    shiftOut = gbaREG.rNUM[opRM] & 0x1;
+    return endRotate;
+}
 uint32_t getASRbyIMM()
 {
     opRDET = currentOpcode;
@@ -276,6 +298,16 @@ uint32_t getASRbyIMM()
     return endRotate;
 }
 uint32_t LSL(uint32_t value, uint8_t shiftAmount)
+{
+    while(shiftAmount != 0)
+    {
+        shiftOut = (value & 0x80000000) != 0;
+        value = value << 1;
+        shiftAmount--;
+    }
+    return value;
+}
+uint32_t LSR(uint32_t value, uint8_t shiftAmount)
 {
     while(shiftAmount != 0)
     {
@@ -308,6 +340,10 @@ uint32_t readMem(int readMode, int location)
         case 2:
             location = location & 0xFFFFFFFC;
         break;
+
+        default:
+
+        break;
     }
     switch(location)
     {
@@ -338,6 +374,33 @@ uint32_t readMem(int readMode, int location)
 
     case 0x02000000 ... 0x0203FFFF:
         location -= 0x02000000;
+        if(readMode == 0)
+        {
+            fix1 = gbaRAM.onBoardWRAM[location];
+        }
+        if(readMode == 1)
+        {
+            return16 = gbaRAM.onBoardWRAM[location] << 8 |
+                       gbaRAM.onBoardWRAM[location + 1];
+            fix1 = return16 >> 8;
+            fix2 = return16;
+        }
+        if(readMode == 2)
+        {
+            return32 = gbaRAM.onBoardWRAM[location] << 24 |
+                       gbaRAM.onBoardWRAM[location + 1] << 16 |
+                       gbaRAM.onBoardWRAM[location + 2] << 8 |
+                       gbaRAM.onBoardWRAM[location + 3];
+            fix1 = return32 >> 24;
+            fix2 = return32 >> 16;
+            fix3 = return32 >> 8;
+            fix4 = return32;
+        }
+    break;
+
+    case 0x02040000 ... 0x02FFFFFF:
+        location -= 0x02000000;
+        location = location % 0x40000;
         if(readMode == 0)
         {
             fix1 = gbaRAM.onBoardWRAM[location];
@@ -446,15 +509,32 @@ uint32_t readMem(int readMode, int location)
 
             case 0x04000104:
                 printf("TIMER1STUB!\n");
-                return 0;
+                return currentOpcode % 0x1000;
             break;
 
             case 0x04000130:
                 return controlBuffer.to_ulong();
             break;
 
+            case 0x04000200:
+                if(readMode == 0x2)
+                {
+                    return readMem(1, 0x04000202) << 16 | readMem(1, 0x04000200);
+                }
+                return gbaREG.IE;
+            break;
+
+            case 0x04000202:
+                return gbaREG.IF;
+            break;
+
+            case 0x04000208:
+                return gbaREG.IME;
+            break;
+
             default:
                 printf("IO REG NOT IMPLEMENTED YET! READ 0x%X\n!",location);
+                //breakpoint = true;
                 return 0;
             break;
         }
@@ -518,7 +598,7 @@ uint32_t readMem(int readMode, int location)
     break;
 
     case 0x07000000 ... 0x070003FF:
-        location -= 0x06000000;
+        location -= 0x07000000;
         if(readMode == 0)
         {
             fix1 = gbaRAM.ObjectRAM[location];
@@ -654,6 +734,7 @@ uint32_t readMem(int readMode, int location)
             }
         break;
     }
+    return 0;
 }
 std::bitset<24> getLowerBits;
 uint32_t trueLocation;
@@ -669,6 +750,33 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
     {
         case 0x02000000 ... 0x0203FFFF:
             location -= 0x02000000;
+            if(writeMode == 0)
+            {
+                gbaRAM.onBoardWRAM[location] = value;
+            }
+            if(writeMode == 1)
+            {
+                fix1 = value >> 8;
+                fix2 = value;
+                gbaRAM.onBoardWRAM[location + 1] = fix1;
+                gbaRAM.onBoardWRAM[location] = fix2;
+            }
+            if(writeMode == 2)
+            {
+                fix1 = value >> 24;
+                fix2 = value >> 16;
+                fix3 = value >> 8;
+                fix4 = value;
+                gbaRAM.onBoardWRAM[location + 3] = fix1;
+                gbaRAM.onBoardWRAM[location + 2] = fix2;
+                gbaRAM.onBoardWRAM[location + 1] = fix3;
+                gbaRAM.onBoardWRAM[location] = fix4;
+            }
+        break;
+
+        case 0x02040000 ... 0x02FFFFFF:
+            location -= 0x02000000;
+            location = location % 0x40000;
             if(writeMode == 0)
             {
                 gbaRAM.onBoardWRAM[location] = value;
@@ -756,7 +864,7 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
                 break;
 
                 case 0x04000008:
-                    breakpoint = true;
+                    //breakpoint = true;
                     printf("VAL: 0x%X\n",value);
                     gbaREG.bgCNT[0] = value;
                 break;
@@ -831,22 +939,41 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
 
                 case 0x04000200:
                     printf("Software is currently attempting to enable Interrupts!\n");
-                    IntReg = gbaREG.IE;
+                    gbaREG.IE = value;
+
+
+                    if(writeMode == 0x2)
+                    {
+                        IntReg = gbaREG.IE;
+                        IntVal = value >> 16;
+                        IntCountW = 0;
+                        for(IntCountW = 0; IntCountW < 0x10; IntCountW++)
+                        {
+                            if(IntVal[IntCountW] == 1)
+                            {
+                                IntReg[IntCountW] = 0;
+                            }
+                        }
+                        gbaREG.IF = IntReg.to_ulong();
+                    }
+                break;
+
+                case 0x04000202:
+                    printf("IF WRITTEN TO! VAL 0x%X\n",value);
+                    //gbaREG.IF = value;
+
+                    IntReg = gbaREG.IF;
                     IntVal = value;
                     IntCountW = 0;
                     for(IntCountW = 0; IntCountW < 0x10; IntCountW++)
                     {
                         if(IntVal[IntCountW] == 1)
                         {
-                            IntReg.flip(IntCountW);
+                            IntReg[IntCountW] = 0;
                         }
                     }
-                    gbaREG.IE = IntReg.to_ulong();
-                break;
-
-                case 0x04000202:
-                    printf("IF WRITTEN TO!\n");
-                    breakpoint = true;
+                    gbaREG.IF = IntReg.to_ulong();
+                    //breakpoint = true;
                 break;
 
                 case 0x04000208:
@@ -1000,6 +1127,7 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
         //printf("DMA REGISTERS WERE WRITTEN TO!\n");
         //printDMARegs();
     }
+    return 0;
 }
 bool allowRun = false;
 bool dontDisplayError = true;
@@ -1072,6 +1200,7 @@ void resetEMU()
             gbaREG.currentlyHalted = false;
             gbaREG.IME = false;
             gbaREG.IE = 0;
+            gbaREG.IF = 0;
 }
 
 bool breakpointOpcodeA;
@@ -1106,6 +1235,7 @@ int handleBreakpoint()
     {
         breakpoint = true;
     }
+    return 0;
 }
 // Some Dear ImGUI Stuff
 const char* glsl_version = "#version 130";
@@ -1113,6 +1243,7 @@ ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 SDL_GLContext gl_context;
 int initFunc()
 {
+    //printf("test\n");
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
     {
         printf("Error: %s\n", SDL_GetError());
@@ -1138,6 +1269,7 @@ int initFunc()
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     ImGui_ImplSDL2_InitForOpenGL(debugScreen,gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
+    return 0;
 }
 
 GLuint screenTexGL;
@@ -1152,6 +1284,7 @@ const char* romName;
 int romSize;
 static MemoryEditor mem_edit_bios;
 
+bool toggleTileDisplay;
 bool displayRAMView;
 bool displayREGView;
 bool displayCPSRView;
@@ -1173,7 +1306,8 @@ bool swapPal;
 bool displayBG0;
 bool displayBG1;
 bool displayBG2;
-uint32_t opcodesPerFrame = 30000;
+bool displayBG3;
+uint32_t opcodesPerFrame = 1000000;
 
 
 bool sFlag;
@@ -1190,6 +1324,12 @@ uint32_t screenBG0Texture[248][248];
 uint32_t screenBG1Texture[248][248];
 uint32_t screenBG2Texture[248][248];
 uint32_t screenBG3Texture[248][248];
+uint32_t iThinkThereIsAMemLeak[248][248]; // This is here to prevent it until i find out the cause.
+bool doInterrupts = true;
+bool previousCPUMode;
+uint32_t spsr1;
+uint32_t spsr2;
+uint32_t spsr3;
 void handleDebugWindow()
 {
     ImGui_ImplOpenGL3_NewFrame();
@@ -1197,7 +1337,7 @@ void handleDebugWindow()
     ImGui::NewFrame();
 
     ImGui::Begin("Screen");
-    ImGui::Image((void*)(intptr_t)screenTexGL,ImVec2(240,160));
+    ImGui::Image((void*)(intptr_t)screenTexGL,ImVec2(240,180));
     ImGui::End();
 
     if(displayBG0 == true)
@@ -1228,6 +1368,16 @@ void handleDebugWindow()
         glGenerateMipmap(GL_TEXTURE_2D);
         ImGui::Begin("BG2");
         ImGui::Image((void*)(intptr_t)BG2TexGL,ImVec2(248,248));
+        ImGui::End();
+    }
+
+    if(displayBG3 == true)
+    {
+        glBindTexture(GL_TEXTURE_2D, BG3TexGL);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG3Texture);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        ImGui::Begin("BG3");
+        ImGui::Image((void*)(intptr_t)BG3TexGL,ImVec2(248,248));
         ImGui::End();
     }
 
@@ -1310,6 +1460,7 @@ void handleDebugWindow()
         ImGui::Checkbox("Display Background 0 Viewer",&displayBG0);
         ImGui::Checkbox("Display Background 1 Viewer",&displayBG1);
         ImGui::Checkbox("Display Background 2 Viewer",&displayBG2);
+        ImGui::Checkbox("Display Background 3 Viewer",&displayBG3);
         ImGui::InputScalar("Opcodes Per Frame:", ImGuiDataType_U32, &opcodesPerFrame, NULL, NULL, "%i", ImGuiInputTextFlags_CharsDecimal);
         ImGui::InputScalar("BG0:", ImGuiDataType_U32, &gbaREG.bgCNT[0], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::End();
@@ -1323,6 +1474,7 @@ void handleDebugWindow()
         {
             ImGui::Begin("Tiles1");
             ImGui::Checkbox("Swap to Default Pallete",&swapPal);
+            ImGui::Checkbox("Toggle Tile Display",&toggleTileDisplay);
             ImGui::Image((void*)(intptr_t)tiles1TexGL,ImVec2(0x3E0,0x3E0));
             ImGui::End();
         }
@@ -1346,6 +1498,15 @@ void handleDebugWindow()
         ImGui::InputScalar("R13:", ImGuiDataType_U32, &gbaREG.rNUM[13], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::InputScalar("R14:", ImGuiDataType_U32, &gbaREG.rNUM[14], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::InputScalar("R15:", ImGuiDataType_U32, &gbaREG.rNUM[15], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+
+        ImGui::InputScalar("R14_irq:", ImGuiDataType_U32, &gbaREG.R1314_irq[1], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("R14_svc:", ImGuiDataType_U32, &gbaREG.R1314_svc[1], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        spsr1 = gbaREG.spsr.to_ulong();
+        spsr2 = gbaREG.spsr_irq.to_ulong();
+        spsr3 = gbaREG.spsr_svc.to_ulong();
+        ImGui::InputScalar("Spsr:", ImGuiDataType_U32, &spsr1, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("Spsr_irq:", ImGuiDataType_U32, &spsr2, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("Spsr_svc:", ImGuiDataType_U32, &spsr3, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::End();
     }
     if(displayCPSRView == true)
@@ -1376,6 +1537,8 @@ void handleDebugWindow()
         ImGui::Begin("Interrupt Registers");
         ImGui::Checkbox("IME",&gbaREG.IME);
         ImGui::InputScalar("IE", ImGuiDataType_U16, &gbaREG.IE, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("IF", ImGuiDataType_U16, &gbaREG.IF, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::Checkbox("Do Interrupts",&doInterrupts);
         ImGui::End();
     }
     if(displayRAMView == true)
@@ -1412,6 +1575,7 @@ void handleDebugWindow()
         {
             ImGui::Begin("Palette RAM");
             mem_edit_bios.DrawContents(gbaRAM.Bg_ObjPalRam,sizeof(gbaRAM.Bg_ObjPalRam), 0x05000000);
+            mem_edit_bios.DrawContents(readablePalRam,sizeof(readablePalRam), 0);
             ImGui::End();
         }
         if(displayVRAM == true)
@@ -1448,6 +1612,7 @@ void handleDebugWindow()
         ImGui::InputScalar("Cycles", ImGuiDataType_U64, &gbaREG.gbaCycles, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::InputScalar("Scanline", ImGuiDataType_U8, &gbaREG.gbaScanline, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::InputScalar("LCD Control", ImGuiDataType_U8, &gbaREG.lcdControl, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputScalar("Video Mode", ImGuiDataType_U8, &currentDispMode, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
         ImGui::End();
     }
     if(displayBreakpointView == true)
@@ -1511,6 +1676,36 @@ void handleDebugWindow()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     SDL_GL_SwapWindow(debugScreen);
 }
+std::bitset<32> signExtend16;
+uint32_t signExtendFunc16(uint16_t value)
+{
+    signExtend16 = value;
+    if((value & 0x8000) == 0x8000)
+    {
+        signExtend16[15] = 0;
+    }
+    if((value & 0x8000) == 0x0000)
+    {
+        signExtend16[31] = 1;
+        signExtend16[30] = 1;
+        signExtend16[29] = 1;
+        signExtend16[28] = 1;
+        signExtend16[27] = 1;
+        signExtend16[26] = 1;
+        signExtend16[25] = 1;
+        signExtend16[24] = 1;
+        signExtend16[23] = 1;
+        signExtend16[22] = 1;
+        signExtend16[21] = 1;
+        signExtend16[20] = 1;
+        signExtend16[19] = 1;
+        signExtend16[18] = 1;
+        signExtend16[17] = 1;
+        signExtend16[16] = 1;
+        signExtend16[15] = 1;
+    }
+    return signExtend16.to_ulong();
+}
 // Readable Pal Ram Update Func
 void updateReadPalF()
 {
@@ -1530,6 +1725,7 @@ void updateReadPalF()
             pCol++;
         }
         pRow++;
+        pCol = 0;
     }
 }
 int handleMainGUI()

@@ -1,83 +1,121 @@
-Games potentially showing graphics:
-Mario Golf (Mode 0)
-Kirby Nightmare in Dreamland (Mode 0?)
+Games Showing Graphics:
+Mother 1+2
 Sonic Pinball Party
+Kirby: Nightmare in Dreamland
 
-Kirby and the Amazing Mirror - Thumb Long Branch With Link Error!
+Games showing Valid? Tilemap:
+Sonic Advance
+Mario Golf
+Pokemon Mystery Dungeon
+
+
+Classic NES                  - Loop?
+
+Crash Bandicoot              - Stuck waiting for Timer 0 Interrupt
+
+Donkey Kong Country 1        - Stuck at 1B4.  (Halted waiting for Interrupts)
+
+Final Fantasy 1 + 2          - Stuck in Weird bios loop
+
+Final Fantasy 5              - Stuck in Weird bios loop
+
+Fire Emblem                  - Waiting for Interrupts in BIOS when no Interrupts are enabled
+
+Fire Emblem: Sacred Stones   - Waiting for Interrupts in BIOS when no Interrupts are enabled
+
+Grand Theft Auto             - Waiting for Interrupts in BIOS
+
+Harvest Moon                 - Unimplemented Write ADDR 0xFFFFFFFC
+
+Kirby and the Amazing Mirror - Stuck waiting for Serial Interrupt
 
 Kirby NID (Mode 7)           - In Loop
 
-Kirby NID                    - Shows Graphics, Infinite Loop
+Kirby NID                    - IN GAME
 
-Mario & Luigi Superstar Saga - WRITE TO ROM ERROR!
+Mario & Luigi Superstar Saga - Unimplemented Write ADDR 0xFFFFC486
 
-Super Mario Advance 1        - WRITE TO ROM ERROR!
+Mario Tennis                 - Unimplemented Misc Instruction 0x2 (Doesn't exist)
 
-Super Mario Advance 2(Mode 7)- Unimplemented Condition 0xB!
+Mega Man Zero                - Loads Valid Tilemap, then halts CPU to wait for interrupts?
 
-Super Mario Advance 2        - WRITE TO ROM ERROR!
+Metroid Zero Mission         - Unknown Read Address 0x1F172B0
 
-Super Mario Advance 3(Mode 7)- Loops trying to change BG1 X Offset.  (Showing graphics?)
+Metriod Fusion               - Unknown Read Address 0x55F65F4
 
-Super Mario Advance 3        - WRITE TO ROM ERROR!
+Super Mario Advance 1        - Stuck waiting for Timer 2 Interrupt
 
-Super Mario Advance 4        - Stuck in Loop!
+Super Mario Advance 2(Mode 7)- Shows Graphics, pressing start crashes on write addr 0x05000400
 
-Super Mario Golf             - Unimplemented MISC Instruction (Showing Nintendo Logo?)
+Super Mario Advance 2        - Stuck waiting for Timer 2 Interrupt
 
-Mario Party Advance          - Unknown Write Addr 0x0!
+Super Mario Advance 3(Mode 7)- Shows Graphics, pressing start causes Infinite Loop
 
-Mario Pinball Land           - Unknown Write Address 0x208
+Super Mario Advance 3        - Stuck waiting for Timer 2 Interrupt
 
-Mario VS DK                  - Thumb Long Branch With Link Error!
+Super Mario Advance 4        - ?
 
-Mario Kart Super Circuit     - Unimplemented MISC Instruction
+Super Mario Golf             - Unimplemented MISC Instruction (Has loaded tilemap gfx)
 
-Mother 1 + 2                 - Stuck In BIOS
+Sword of Mana                - Waiting for Interrupts in BIOS when none are Enabled
 
-Mother 3                     - Stuck at 0x348
+Mario Party Advance          - Stuck in Weird BIOS loop
 
-One Piece                    - Unimplemented Shifter Opernand B25: 0 and B6tB4: 0x7
+Mario Pinball Land           - Waiting for Interrupts in BIOS
 
-Pokemon Emerald              - Stuck in BIOS
+Mario VS DK                  - Waiting for Timer 0 Interrupt
 
-Pokemon Fire Red             - Stuck in BIOS
+Mario Kart Super Circuit     - Waiting for Interrupts
 
-Pokemon Mystery Dungeon (Red)- Unknown Read Address
+Mother 1 + 2                 - Waiting for Interrupts in BIOS \ Shows Nintendo Logo
+
+Mother 3                     - Waiting for Interrupts in BIOS
+
+One Piece                    - Waiting for Serial Interrupt
+
+Pokemon Emerald              - Stuck in Loop
+
+Pokemon Fire Red             - Stuck in Loop
+
+Pokemon Mystery Dungeon (Red)- Waiting for Interrupts in BIOS
 
 Pokemon Ruby                 - Stuck in BIOS
 
 Pokemon Sapphire             - Stuck in BIOS
 
-Pokemon Pinball (Intro)      - ?
+Pokemon Pinball (Intro)      - Jumps to invalid address
 
-Sonic Advance 1              - Unimplemented Multiply 0x4. (Used Incorrect Jump?)
+Sonic Advance 1              - Waiting for Interrupts in BIOS
 
-Sonic Advance 2              - Unimplemented Multiply 0x4. (Used Incorrect Jump?)
+Sonic Advance 2              - Waiting for Interrupts in BIOS
 
-Sonic Advance 3              - Stuck in loop with WARN 0xD?
+Sonic Advance 3              - Waiting for Interrupts in BIOS
 
-Sonic Battle                 - Unimplemented Condition 0xF!
+Sonic Battle                 - Waiting for Interrupts in BIOS
 
-Sonic Genesis                - WRITE TO ROM ERROR!
+Sonic Genesis                - Waiting for Interrupts in BIOS
 
-Sonic Pinball Party  (VENOM) - Unimplemented OP XXXX000 then 0x6!
+Sonic Pinball Party  (VENOM) - Does Weird thing with pallete, then inf loop
 
-Sonic Pinball Party          - Shows Graphics.
+Sonic Pinball Party          - Successfully gets to title screen
 
-Tetris Worlds                - Write to ROM
+Tetris Worlds                - Waiting for Interrupts in BIOS
 
-The Legend of Z: LTTP(Mode 7)- In loop
+The Legend of Z: LTTP(Mode 7)- Stuck in loop accessing mirrored ram?
 
-The Legend of Z: LTTP        - Unimplemented Condition 0xF!
+The Legend of Z: LTTP        - Waiting for Interrupts in BIOS
 
-The Legend of Zelda: Minish  - Unimplemented OP XXXX110END!
+The Legend of Zelda: Minish  - Waiting for Interrupts in BIOS
 
 Wario Land 4                 - Unimplemented Condition 0xF!
 
 Wario Ware Inc (Intro)       - ?
 
 Wario Ware Twisted           - Stuck Enabling DMA2
+
+Yoshi Story 3.0              - Stuck waiting for Timer 0 Interrupt
+
+Yoshi Story                  - Loops (Halted CPU?)
 
 Most Common Error Codes:
 15 + 1/6: Invalid Read/Write Address
@@ -86,18 +124,18 @@ Most Common Error Codes:
 
 Armwrestler:     - Shows Grapics, can use input in menu.
     Test 1: FAIL, Finished Successfully
-    Test 2: Unimplemented shiftOP mode 0x1
+    Test 2: PASS, Finished Successfully
     Test 3: FAIL, Finished Successfully
-    Test 4: FAIL, Finished Successfully
+    Test 4: PASS, Finished Successfully
     Test 5: PASS, Finished Successfully
     Test 6: PASS, Finished Successfully
 
-Aging.gba                    - Write to ROM
-Hello.gba                    - Unknown Read Address 0xFE100000
-CPUTest.gba                  - Infinite Loop
-thumb.gba                    - Unknown Read Address 0xFF00
+Aging.gba                    - Stuck in Small Loop
+Hello.gba                    - Works
+CPUTest.gba                  - PASS
+thumb.gba                    - Failed Test 052
 badapple.gba                 - Stuck in loop reading from timers
-Suite.gba                    - Unimplemented 010000 Thumb Opcode 0x5!
+Suite.gba                    - Unknown Read Address 0xFFFFFFFC
 
 Bios issues:
 00000158: R11 anded with 1f, put in r11, was set to zero.  Z flag was set, but no&gba didnt set
@@ -107,4 +145,13 @@ doesn't seem to have mattered though
 00000BA4: Compared 0 to r12 containing 400.  C flag was not set.  no$gba says otherwise
 
 line 500
+
+All BIOS Calls that have been made by games:
+
+0x1: RegisterRamReset
+0x5: VBlankIntrWait (Definitly isn't working properly)
+0xB: CpuSet
+0xC: CpuFastSet
+0x12: LZ77UnCompReadNormalWrite16Bbit  ; VRAM  (Isn't working properly?)
+
 

@@ -67,13 +67,13 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
             if(result64 > 0xFFFFFFFF)
             {
                 gbaREG.cpsr[29] = 1;
-                break;
             }
             if(result64 <= 0xFFFFFFFF)
             {
                 gbaREG.cpsr[29] = 0;
-                break;
             }
+            //gbaREG.cpsr[29] = (result64 & 0x100000000);
+            //gbaREG.cpsr.flip(29);
             //if(gbaREG.cpsr[5] == 1)
             //{
             //    break;
@@ -106,15 +106,19 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
 
         case 3:
             result64 = original - valueUsed;
-            if(result64 > 0xFFFFFFFF)
-            {
-                gbaREG.cpsr[29] = 0;
-            }
-            if(result64 <= 0xFFFFFFFF)
-            {
-                gbaREG.cpsr[29] = 1;
-            }
-            //gbaREG.cpsr[29] = resultBitset[32];
+            //if(result64 > 0xFFFFFFFF)
+            //{
+            //    gbaREG.cpsr[29] = 0;
+            //}
+            //if(result64 <= 0xFFFFFFFF)
+            //{
+            //    gbaREG.cpsr[29] = 1;
+            //}
+
+            gbaREG.cpsr[29] = (result64 & 0x100000000);
+            gbaREG.cpsr.flip(29);
+            //gbaREG.cpsr[29] = LSR(result64, 32) & 0x1;
+
             //gbaREG.cpsr.flip(29);
             /*
             if(((original ^ valueUsed ^ result) & 0x100000000) == 0x100000000)
@@ -129,7 +133,7 @@ void handleCarryFlag(uint64_t original, uint64_t result, uint8_t operation, uint
         break;
 
         case 4:
-            checkLSRFlag = ( original >> (valueUsed - 1)) & 0x1;
+            checkLSRFlag = (original >> (valueUsed - 1)) & 0x1;
             gbaREG.cpsr[29] = checkLSRFlag;
         break;
 
@@ -299,6 +303,21 @@ int handleOverflowFlag(int32_t original, int32_t result, uint8_t operation, int3
             opcodeError = true;
         break;
     }
+    return 0;
+}
+
+void customBios5()
+{
+    gbaREG.R1314_irq[1] = gbaREG.rNUM[15] + 4;
+    printf("SWI 0x5 Stub because default is broken!\n");
+    gbaREG.spsr_irq = gbaREG.cpsr.to_ulong();
+    gbaREG.rNUM[15] = 0x18;
+    gbaREG.cpsr[5] = 0;
+    gbaREG.cpsr[4] = 1;
+    gbaREG.cpsr[3] = 0;
+    gbaREG.cpsr[2] = 0;
+    gbaREG.cpsr[1] = 1;
+    gbaREG.cpsr[0] = 0;
 }
 // From this file
 std::bitset<8> word8IMM;
@@ -337,11 +356,16 @@ void thumbMovLSL()
     thumbOffset5B = currentThumbOpcode >> 6;
     thumboffset5 = thumbOffset5B.to_ulong();
     ZOriginal = gbaREG.rNUM[opRD];
-    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] << thumboffset5;
+    if(thumboffset5 == 0x0)
+    {
+        thumboffset5 = 0x20;
+    }
+    //gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] << thumboffset5;
+    gbaREG.rNUM[opRD] = LSL(gbaREG.rNUM[opRN], thumboffset5);
 
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
-    handleCarryFlag(gbaREG.rNUM[opRN], gbaREG.rNUM[opRD],0,thumboffset5);
+    handleCarryFlag(gbaREG.rNUM[opRN], gbaREG.rNUM[opRD],6,thumboffset5);
 
     gbaREG.rNUM[15] += 2;
 }
@@ -364,6 +388,7 @@ void doSoftwareInterrupt()
     //gbaREG.R1314_svc[0] = gbaREG.rNUM[13];
     gbaREG.spsr_svc = gbaREG.cpsr.to_ulong();
     gbaREG.rNUM[15] = 0x8;
+    gbaREG.cpsr[7] = 1;
     gbaREG.cpsr[5] = 0;
     gbaREG.cpsr[4] = 1;
     gbaREG.cpsr[3] = 0;
@@ -588,6 +613,7 @@ void thumbLongBranchWithLink()
     offsetBit = currentThumbOpcode >> 11;
     if(offsetBit[0] == 0)
     {
+        //breakpoint = true;
         offset11 = currentThumbOpcode;
         B23VAR = offset11.to_ulong();
         B23VAR = B23VAR << 12;
@@ -615,16 +641,28 @@ void thumbLongBranchWithLink()
         offset11 = afterThisOP;
         gbaREG.rNUM[14] += (offset11.to_ulong()) << 1;
         backupForPCLongBranch = gbaREG.rNUM[15];
-        gbaREG.rNUM[15] = gbaREG.rNUM[14] + 4;
-        gbaREG.rNUM[14] = backupForPCLongBranch + 4;
+        gbaREG.rNUM[15] = (gbaREG.rNUM[14] + 4) & 0xFFFFFFFE;
+        gbaREG.rNUM[14] = (backupForPCLongBranch + 4) | 1;
         setB0LR = gbaREG.rNUM[14];
         setB0LR[0] = 1;
         gbaREG.rNUM[14] = setB0LR.to_ulong();
     }
     if(offsetBit[0] == 1)
     {
-        opcodeError = true;
-        printf("ThumbLongBranchWithLinkError\n");
+        //opcodeError = true;
+        breakpoint = true;
+        printf("ThumbLongBranchWithLinkWarn\n");
+        afterThisOP = readMem(1,gbaREG.rNUM[15]);
+        //afterThisOP = gbaRAM.flashROM[(gbaREG.rNUM[15] - 0x08000000) + 3] << 8 |
+        //              gbaRAM.flashROM[(gbaREG.rNUM[15] - 0x08000000) + 2];
+        offset11 = afterThisOP;
+        gbaREG.rNUM[14] += (offset11.to_ulong()) << 1;
+        backupForPCLongBranch = gbaREG.rNUM[15];
+        gbaREG.rNUM[15] = gbaREG.rNUM[14] & 0xFFFFFFFE;
+        gbaREG.rNUM[14] = (backupForPCLongBranch + 2) | 1;
+        setB0LR = gbaREG.rNUM[14];
+        setB0LR[0] = 1;
+        gbaREG.rNUM[14] = setB0LR.to_ulong();
     }
 }
 void thumbOPADDorSUB()
@@ -667,6 +705,7 @@ void thumbOPADDorSUB()
 }
 void thumbOPBIC()
 {
+    //breakpoint = true;
     opRDET3B = currentThumbOpcode;
     opRD = opRDET3B.to_ulong();
     opRDET3B = currentThumbOpcode >> 3;
@@ -750,10 +789,12 @@ void thumbOP001ADD()
 uint32_t comparethumb001CMP;
 void thumbOP001CMP()
 {
-    immed82 = currentThumbOpcode;
-    offset8Immed = immed82.to_ulong();
-    opRDET3B = currentThumbOpcode >> 8;
-    opRD = opRDET3B.to_ulong();
+    //immed82 = currentThumbOpcode;
+    //offset8Immed = immed82.to_ulong();
+    offset8Immed = currentThumbOpcode & 0xFF;
+    //opRDET3B = currentThumbOpcode >> 8;
+    //opRD = opRDET3B.to_ulong();
+    opRD = (currentThumbOpcode >> 8) & 0x7;
     ZOriginal = gbaREG.rNUM[opRD];
     comparethumb001CMP = gbaREG.rNUM[opRD];
     comparethumb001CMP -= offset8Immed;
@@ -779,6 +820,10 @@ void thumbOPBranchOrExchange()
     gbaREG.cpsr[5] = checkB0forSwitch[0];
     checkB0forSwitch[0] = 0;
     gbaREG.rNUM[15] = checkB0forSwitch.to_ulong();
+    if(opRS == 0xF)
+    {
+        gbaREG.rNUM[15] += 4;
+    }
 }
 std::bitset<5> offset5;
 uint8_t offset5u;
@@ -882,8 +927,14 @@ void thumbMovLSR()
     opRN = opRDET3B.to_ulong();
     thumbOffset5B = currentThumbOpcode >> 6;
     thumboffset5 = thumbOffset5B.to_ulong();
-    ZOriginal = gbaREG.rNUM[opRD];
+    ZOriginal = gbaREG.rNUM[opRN];
+    //gbaREG.rNUM[opRD] = LSR(gbaREG.rNUM[opRN],thumboffset5);
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRN] >> thumboffset5;
+    if(thumboffset5 == 0x0)
+    {
+        gbaREG.rNUM[opRD] = 0;
+        thumboffset5 = 0x20;
+    }
     origValBit = ZOriginal;
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal, gbaREG.rNUM[opRD]);
@@ -901,8 +952,8 @@ void thumbMovASR()
     opRN = opRDET3B.to_ulong();
     thumbOffset5B = currentThumbOpcode >> 6;
     thumboffset5 = thumbOffset5B.to_ulong();
-    ZOriginal = gbaREG.rNUM[opRD];
-    ASRtemp = ZOriginal;
+    ZOriginal = gbaREG.rNUM[opRN];
+    ASRtemp = gbaREG.rNUM[opRN];
     if(thumboffset5 == 0x0)
     {
         thumboffset5 = 0x20;
@@ -947,13 +998,15 @@ void thumbOP010001ADD()
     opRDET = currentThumbOpcode >> 3;
     opRDET[3] = op16bit[6];
     opRS = opRDET.to_ulong();
-    comparethumb001CMP = gbaREG.rNUM[opRD];
+    comparethumb001CMP = gbaREG.rNUM[opRS];
+    ZOriginal = gbaREG.rNUM[opRD];
+    //gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS] + gbaREG.rNUM[opRD];
+    //handleCarryFlag(gbaREG.rNUM[opRD],gbaREG.rNUM[opRS] + gbaREG.rNUM[opRD],2,gbaREG.rNUM[opRS]);
+    //handleOverflowFlag(gbaREG.rNUM[opRD],gbaREG.rNUM[opRD] - gbaREG.rNUM[opRS],2,gbaREG.rNUM[opRS]);
+    //cmpResultThumb = gbaREG.rNUM[opRD] + gbaREG.rNUM[opRS];
+    //handleSignFlag(cmpResultThumb);
+    //handleZeroFlag(comparethumb001CMP,cmpResultThumb);
     gbaREG.rNUM[opRD] = gbaREG.rNUM[opRS] + gbaREG.rNUM[opRD];
-    handleCarryFlag(comparethumb001CMP,gbaREG.rNUM[opRD],2,gbaREG.rNUM[opRS]);
-    handleOverflowFlag(gbaREG.rNUM[opRD],gbaREG.rNUM[opRD] - gbaREG.rNUM[opRS],2,gbaREG.rNUM[opRS]);
-    cmpResultThumb = gbaREG.rNUM[opRD] + gbaREG.rNUM[opRS];
-    handleSignFlag(cmpResultThumb);
-    handleZeroFlag(comparethumb001CMP,cmpResultThumb);
     gbaREG.rNUM[15] += 2;
 }
 void thumbOPMoveHI()
@@ -1146,12 +1199,16 @@ void thumbOPLSL()
 }
 void thumbOPLSR()
 {
+    //breakpoint = true;
     opRDET3B = currentThumbOpcode;
     opRD = opRDET3B.to_ulong();
     opRDET3B = currentThumbOpcode >> 3;
     opRS = opRDET3B.to_ulong();
     ZOriginal = gbaREG.rNUM[opRD];
-    gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] >> gbaREG.rNUM[opRS];
+    //printf("op1: 0x%X\n",gbaREG.rNUM[opRD]);
+    //printf("op2: 0x%X\n",gbaREG.rNUM[opRS]);
+    gbaREG.rNUM[opRD] = LSR(gbaREG.rNUM[opRD],gbaREG.rNUM[opRS]);
+    //printf("op3: 0x%X\n",gbaREG.rNUM[opRD]);
     handleSignFlag(gbaREG.rNUM[opRD]);
     handleZeroFlag(ZOriginal,gbaREG.rNUM[opRD]);
     handleCarryFlag(ZOriginal,gbaREG.rNUM[opRD],4,gbaREG.rNUM[opRS]);
@@ -1369,7 +1426,7 @@ void thumbOPLoadStoreSignExtendByteOrHalfword()
             {
                 case 0: // Signed Load Byte
                     gbaREG.rNUM[opRD] = readMem(0,gbaREG.rNUM[opRB] + gbaREG.rNUM[opRO]);
-                    if(gbaREG.rNUM[opRD] & 0x80 != 0)
+                    if((gbaREG.rNUM[opRD] & 0x80) != 0)
                     {
                         gbaREG.rNUM[opRD] = gbaREG.rNUM[opRD] | 0xFFFFFF00;
                     }
@@ -1394,19 +1451,19 @@ uint8_t op000Thumbu;
 uint8_t op01000Thumbu;
 void doThumbOpcode(uint16_t opcode)
 {
-    op16bit = opcode;
-    switch(op16bit[15])
+    //op16bit = opcode;
+    switch(opcode & 0x8000)
     {
         case 0: // 0
-            switch(op16bit[14])
+            switch(opcode & 0x4000)
             {
                 case 0: // 00
-                    switch(op16bit[13])
+                    switch(opcode & 0x2000)
                     {
                         case 0:// 000
-                            op000Thumb = currentThumbOpcode >> 11;
-                            op000Thumbu = op000Thumb.to_ulong();
-                            switch(op000Thumbu)
+                            //op000Thumb = currentThumbOpcode >> 11;
+                            //op000Thumbu = op000Thumb.to_ulong();
+                            switch((currentThumbOpcode >> 11) & 0x3)
                             {
                                 case 0x0: // LSL
                                     thumbMovLSL();
@@ -1431,10 +1488,10 @@ void doThumbOpcode(uint16_t opcode)
                             }
                         break;
 
-                        case 1: // 001
-                            op000Thumb = currentThumbOpcode >> 11;
-                            op000Thumbu = op000Thumb.to_ulong();
-                            switch(op000Thumbu)
+                        case 0x2000: // 001
+                            //op000Thumb = currentThumbOpcode >> 11;
+                            //op000Thumbu = op000Thumb.to_ulong();
+                            switch((currentThumbOpcode >> 11) & 0x3)
                             {
                                 case 0:
                                     thumbMov8Immediate();
@@ -1461,22 +1518,22 @@ void doThumbOpcode(uint16_t opcode)
                     }
                 break;
 
-                case 1: // 01
-                    switch(op16bit[13])
+                case 0x4000: // 01
+                    switch(opcode & 0x2000)
                     {
                         case 0: // 010
-                            switch(op16bit[12])
+                            switch(opcode & 0x1000)
                             {
                                 case 0: // 0100
-                                    switch(op16bit[11])
+                                    switch(opcode & 0x800)
                                     {
                                         case 0: // 01000
-                                            switch(op16bit[10])
+                                            switch(opcode & 0x400)
                                             {
                                                 case 0:
-                                                    op01000Thumb = currentThumbOpcode >> 6;
-                                                    op01000Thumbu = op01000Thumb.to_ulong();
-                                                    switch(op01000Thumbu)
+                                                    //op01000Thumb = currentThumbOpcode >> 6;
+                                                    //op01000Thumbu = op01000Thumb.to_ulong();
+                                                    switch((currentThumbOpcode >> 6) & 0xF)
                                                     {
 
                                                         case 0x0:
@@ -1551,10 +1608,10 @@ void doThumbOpcode(uint16_t opcode)
                                                     }
                                                 break;
 
-                                                case 1: // 010001
-                                                    op000Thumb = currentThumbOpcode >> 8;
-                                                    op000Thumbu = op000Thumb.to_ulong();
-                                                    switch(op000Thumbu)
+                                                case 0x400: // 010001
+                                                    //op000Thumb = currentThumbOpcode >> 8;
+                                                    //op000Thumbu = op000Thumb.to_ulong();
+                                                    switch((currentThumbOpcode >> 8) & 0x3)
                                                     {
                                                         case 0:
                                                             thumbOP010001ADD();
@@ -1581,20 +1638,20 @@ void doThumbOpcode(uint16_t opcode)
                                             }
                                         break;
 
-                                        case 1: // 01001 PC RELATIVE LOAD
+                                        case 0x800: // 01001 PC RELATIVE LOAD
                                             pcRelativeLoad();
                                         break;
                                     }
                                 break;
 
-                                case 1: // 0101
-                                    switch(op16bit[9])
+                                case 0x1000: // 0101
+                                    switch(opcode & 0x200)
                                     {
                                         case 0:
                                             thumbOPloadStorewRegisterOffset();
                                         break;
 
-                                        case 1:
+                                        case 0x200:
                                             thumbOPLoadStoreSignExtendByteOrHalfword();
                                         break;
                                     }
@@ -1602,7 +1659,7 @@ void doThumbOpcode(uint16_t opcode)
                             }
                         break;
 
-                        case 1: // 011
+                        case 0x2000: // 011
                             thumbOP001strORldr();
                         break;
                     }
@@ -1610,40 +1667,40 @@ void doThumbOpcode(uint16_t opcode)
             }
         break;
 
-        case 1: // 1
-            switch(op16bit[14])
+        case 0x8000: // 1
+            switch(opcode & 0x4000)
             {
                 case 0: // 10
-                    switch(op16bit[13])
+                    switch(opcode & 0x2000)
                     {
                         case 0: // 100
-                            switch(op16bit[12])
+                            switch(opcode & 0x1000)
                             {
                                 case 0: // 1000
                                     thumbOPLoadStoreHalfword();
                                 break;
 
-                                case 1: // 1001
+                                case 0x1000: // 1001
                                     thumbOPSPrelLoadStore();
                                 break;
                             }
                         break;
 
-                        case 1: // 101
-                            switch(op16bit[12])
+                        case 0x2000: // 101
+                            switch(opcode & 0x1000)
                             {
                                 case 0: // 1010
                                     thumbOPloadAddress();
                                 break;
 
-                                case 1: // 1011
-                                    switch(op16bit[10])
+                                case 0x1000: // 1011
+                                    switch(opcode & 0x400)
                                     {
                                         case 0: // 1011X0
                                             thumbOPAddToStackPointer();
                                         break;
 
-                                        case 1: // 1011X1
+                                        case 0x400: // 1011X1
                                             thumbOPPushPopReg();
                                         break;
                                     }
@@ -1653,30 +1710,30 @@ void doThumbOpcode(uint16_t opcode)
                     }
                 break;
 
-                case 1: // 11
-                    switch(op16bit[13])
+                case 0x4000: // 11
+                    switch(opcode & 0x2000)
                     {
                         case 0: // 110
-                            switch(op16bit[12])
+                            switch(opcode & 0x1000)
                             {
                                 case 0: // 1100
                                     thumbOPSTMIAorLDMIA();
                                 break;
 
-                                case 1: // 1101
+                                case 0x1000: // 1101
                                     thumbConditionalBranch();
                                 break;
                             }
                         break;
 
-                        case 1: // 111
-                            switch(op16bit[12])
+                        case 0x2000: // 111
+                            switch(opcode & 0x1000)
                             {
                                 case 0:
                                     thumbOPUnconditionalBranch();
                                 break;
 
-                                case 1: // 1111
+                                case 0x1000: // 1111
                                     thumbLongBranchWithLink();
                                 break;
                             }

@@ -1,11 +1,10 @@
 #include "input.hpp"
-uint32_t screenTexture[160][240];
+uint32_t screenTexture[180][240];
 uint32_t palTexture[0x1E * 2][0xF * 2];
 uint32_t tiles1Texture[0x3E0][0x3E0];
 uint16_t colorWrite;
 std::bitset<16> colorWriteInvert;
 std::bitset<32> finalColor = 0xFF000000;
-uint8_t currentDispMode;
 std::bitset<3> currentDispMode2;
 int xPos = 0;
 int yPos = 0;
@@ -86,8 +85,8 @@ int basicMode0Render()
     bg0Screen = (gbaREG.bgCNT[0] >> 8) & 0x1F;
     bg0Char = (gbaREG.bgCNT[0] >> 2) & 0x3;
     //breakpoint = true;
-    printf("bg0S: 0x%X\n",bg0Screen);
-    printf("bg0C: 0x%X\n",bg0Char);
+    //printf("bg0S: 0x%X\n",bg0Screen);
+    //printf("bg0C: 0x%X\n",bg0Char);
     uint32_t tileLocate;
     uint32_t tileData;
     uint16_t charIndex;
@@ -103,9 +102,9 @@ int basicMode0Render()
     yTile = 0;
     uint8_t currentByteRender;
     tileData = readMem(2,tileLocate);
-    while(yTile != 0x20)
+    while(yTile != 0x1F)
     {
-        while(xTile != 0x20)
+        while(xTile != 0x1F)
         {
             while(yPosT != 8)
             {
@@ -123,9 +122,9 @@ int basicMode0Render()
                     if(swapPal == false)
                     {
                         screenBG0Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
                     if(swapPal == true)
                     {
@@ -139,25 +138,25 @@ int basicMode0Render()
                         }
 
                         screenBG0Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
 
-                    xPosT++;
+                    ++xPosT;
                     xPosT2 = flipFix[xPosT] + (xTile * 8);
                 }
                 //printf("xP: 0x%X\n",xPosT);
                 xPosT = 0;
                 xPosT2 = xTile * 8;
-                yPosT++;
+                ++yPosT;
                 yPosT2 = (yTile * 8) + yPosT;
                 tileLocate += 4;
                 tileData = readMem(2,tileLocate);
             }
             yPosT = 0;
             yPosT2 = (yTile * 8);
-            xTile++;
+            ++xTile;
             xPosT2 = xTile * 8;
             charData = readMem(1, 0x06000000 + (bg0Screen * 0x800) + (xTile * 2) + (yTile * 0x40));
             charIndex = charData & 0x1FF;
@@ -167,20 +166,18 @@ int basicMode0Render()
         xPosT = 0;
         xTile = 0;
         xPosT2 = xTile * 8;
-        yTile++;
+        ++yTile;
         yPosT = 0;
         yPosT2 = (yTile * 8);
     }
     xPosT = 0;
     yPosT = 0;
 
-
-
     bg0Screen = (gbaREG.bgCNT[1] >> 8) & 0x1F;
     bg0Char = (gbaREG.bgCNT[1] >> 2) & 0x3;
     //breakpoint = true;
-    printf("bg1S: 0x%X\n",bg0Screen);
-    printf("bg1C: 0x%X\n",bg0Char);
+    //printf("bg1S: 0x%X\n",bg0Screen);
+    //printf("bg1C: 0x%X\n",bg0Char);
     tileLocate = 0;
     tileData = 0;
     charIndex = 0;
@@ -196,9 +193,9 @@ int basicMode0Render()
     yTile = 0;
     currentByteRender = 0;
     tileData = readMem(2,tileLocate);
-    while(yTile != 0x20)
+    while(yTile != 0x1F)
     {
-        while(xTile != 0x20)
+        while(xTile != 0x1F)
         {
             while(yPosT != 8)
             {
@@ -211,14 +208,14 @@ int basicMode0Render()
                     }
                     if(xPosT == 0x7)
                     {
-                        currentByteRender = tileData;
+                        currentByteRender = tileData & 0xF;
                     }
                     if(swapPal == false)
                     {
                         screenBG1Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
                     if(swapPal == true)
                     {
@@ -232,9 +229,9 @@ int basicMode0Render()
                         }
 
                         screenBG1Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
 
                     xPosT++;
@@ -245,6 +242,7 @@ int basicMode0Render()
                 xPosT2 = xTile * 8;
                 yPosT++;
                 yPosT2 = (yTile * 8) + yPosT;
+                //printf("tileLocate: 0x%X\n",tileLocate);
                 tileLocate += 4;
                 tileData = readMem(2,tileLocate);
             }
@@ -273,8 +271,8 @@ int basicMode0Render()
     bg0Screen = (gbaREG.bgCNT[2] >> 8) & 0x1F;
     bg0Char = (gbaREG.bgCNT[2] >> 2) & 0x3;
     //breakpoint = true;
-    printf("bg2S: 0x%X\n",bg0Screen);
-    printf("bg2C: 0x%X\n",bg0Char);
+    //printf("bg2S: 0x%X\n",bg0Screen);
+    //printf("bg2C: 0x%X\n",bg0Char);
     tileLocate = 0;
     tileData = 0;
     charIndex = 0;
@@ -290,9 +288,9 @@ int basicMode0Render()
     yTile = 0;
     currentByteRender = 0;
     tileData = readMem(2,tileLocate);
-    while(yTile != 0x20)
+    while(yTile != 0x1F)
     {
-        while(xTile != 0x20)
+        while(xTile != 0x1F)
         {
             while(yPosT != 8)
             {
@@ -310,9 +308,9 @@ int basicMode0Render()
                     if(swapPal == false)
                     {
                         screenBG2Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
                     if(swapPal == true)
                     {
@@ -326,9 +324,9 @@ int basicMode0Render()
                         }
 
                         screenBG2Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
 
                     xPosT++;
@@ -360,10 +358,475 @@ int basicMode0Render()
     }
     xPosT = 0;
     yPosT = 0;
+
+
+
+    bg0Screen = (gbaREG.bgCNT[3] >> 8) & 0x1F;
+    bg0Char = (gbaREG.bgCNT[3] >> 2) & 0x3;
+    //breakpoint = true;
+    //printf("bg3S: 0x%X\n",bg0Screen);
+    //printf("bg3C: 0x%X\n",bg0Char);
+    tileLocate = 0;
+    tileData = 0;
+    charIndex = 0;
+    charData = 0;
+    charData = readMem(1, 0x06000000 + bg0Screen * 0x800);
+    charIndex = charData & 0x1FF;
+    tileLocate = 0x06000000 + charIndex + (bg0Char * 0x4000);
+    xPosT = 0;
+    yPosT = 0;
+    xPosT2 = 0;
+    yPosT2 = 0;
+    xTile = 0;
+    yTile = 0;
+    currentByteRender = 0;
+    tileData = readMem(2,tileLocate);
+    while(yTile != 0x1F)
+    {
+        while(xTile != 0x1F)
+        {
+            while(yPosT != 8)
+            {
+                while(xPosT != 8)
+                {
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                    if(xPosT != 0x7)
+                    {
+                        currentByteRender = tileData >> (28 - ((xPosT) * 4));
+                    }
+                    if(xPosT == 0x7)
+                    {
+                        currentByteRender = tileData;
+                    }
+                    if(swapPal == false)
+                    {
+                        screenBG3Texture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
+                    }
+                    if(swapPal == true)
+                    {
+                        uint8_t loopRead = 0;
+                        while (loopRead != 0x10)
+                        {
+                            readablePalRam[0][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[1][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[2][0][loopRead] = loopRead * 0x10;
+                            loopRead++;
+                        }
+
+                        screenBG3Texture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
+                    }
+
+                    xPosT++;
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                }
+                //printf("xP: 0x%X\n",xPosT);
+                xPosT = 0;
+                xPosT2 = xTile * 8;
+                yPosT++;
+                yPosT2 = (yTile * 8) + yPosT;
+                tileLocate += 4;
+                tileData = readMem(2,tileLocate);
+            }
+            yPosT = 0;
+            yPosT2 = (yTile * 8);
+            xTile++;
+            xPosT2 = xTile * 8;
+            charData = readMem(1, 0x06000000 + (bg0Screen * 0x800) + (xTile * 2) + (yTile * 0x40));
+            charIndex = charData & 0x1FF;
+            tileLocate = 0x06000000 + (charIndex * 0x20) + (bg0Char * 0x4000);
+            //printf("tileLocate: 0x%X\n",tileLocate);
+        }
+        xPosT = 0;
+        xTile = 0;
+        xPosT2 = xTile * 8;
+        yTile++;
+        yPosT = 0;
+        yPosT2 = (yTile * 8);
+    }
+    xPosT = 0;
+    yPosT = 0;
+    return 0;
 }
+
+int basicMode0RenderMSC()
+{
+    bg0Screen = (gbaREG.bgCNT[3] >> 8) & 0x1F;
+    bg0Char = (gbaREG.bgCNT[3] >> 2) & 0x3;
+    //breakpoint = true;
+    //printf("bg0S: 0x%X\n",bg0Screen);
+    //printf("bg0C: 0x%X\n",bg0Char);
+    uint32_t tileLocate;
+    uint32_t tileData;
+    uint16_t charIndex;
+    uint16_t charData;
+    uint8_t charPal;
+    charData = readMem(1, 0x06000000 + bg0Screen * 0x800);
+    charIndex = charData & 0x1FF;
+    charPal = (charData >> 12) & 0xF;
+    tileLocate = 0x06000000 + charIndex + (bg0Char * 0x4000);
+    xPosT = 0;
+    yPosT = 0;
+    xPosT2 = 0;
+    yPosT2 = 0;
+    xTile = 0;
+    yTile = 0;
+    uint8_t currentByteRender;
+    tileData = readMem(2,tileLocate);
+    while(yTile != 0x14)
+    {
+        while(xTile != 0x1F)
+        {
+            while(yPosT != 8)
+            {
+                while(xPosT != 8)
+                {
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                    if(xPosT != 0x7)
+                    {
+                        currentByteRender = tileData >> (28 - ((xPosT) * 4));
+                    }
+                    if(xPosT == 0x7)
+                    {
+                        currentByteRender = tileData;
+                    }
+                    if(swapPal == false)
+                    {
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+                    if(swapPal == true)
+                    {
+                        uint8_t loopRead = 0;
+                        while (loopRead != 0x10)
+                        {
+                            readablePalRam[0][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[1][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[2][0][loopRead] = loopRead * 0x10;
+                            loopRead++;
+                        }
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+
+                    ++xPosT;
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                }
+                //printf("xP: 0x%X\n",xPosT);
+                xPosT = 0;
+                xPosT2 = xTile * 8;
+                ++yPosT;
+                yPosT2 = (yTile * 8) + yPosT;
+                tileLocate += 4;
+                tileData = readMem(2,tileLocate);
+            }
+            yPosT = 0;
+            yPosT2 = (yTile * 8);
+            ++xTile;
+            xPosT2 = xTile * 8;
+            charData = readMem(1, 0x06000000 + (bg0Screen * 0x800) + (xTile * 2) + (yTile * 0x40));
+            charIndex = charData & 0x1FF;
+            tileLocate = 0x06000000 + (charIndex * 0x20) + (bg0Char * 0x4000);
+            //printf("tileLocate: 0x%X\n",tileLocate);
+        }
+        xPosT = 0;
+        xTile = 0;
+        xPosT2 = xTile * 8;
+        ++yTile;
+        yPosT = 0;
+        yPosT2 = (yTile * 8);
+    }
+    xPosT = 0;
+    yPosT = 0;
+
+    bg0Screen = (gbaREG.bgCNT[2] >> 8) & 0x1F;
+    bg0Char = (gbaREG.bgCNT[2] >> 2) & 0x3;
+    //breakpoint = true;
+    //printf("bg0S: 0x%X\n",bg0Screen);
+    //printf("bg0C: 0x%X\n",bg0Char);
+    charData = readMem(1, 0x06000000 + bg0Screen * 0x800);
+    charIndex = charData & 0x1FF;
+    charPal = (charData >> 12) & 0xF;
+    tileLocate = 0x06000000 + charIndex + (bg0Char * 0x4000);
+    xPosT = 0;
+    yPosT = 0;
+    xPosT2 = 0;
+    yPosT2 = 0;
+    xTile = 0;
+    yTile = 0;
+    tileData = readMem(2,tileLocate);
+    while(yTile != 0x14)
+    {
+        while(xTile != 0x1F)
+        {
+            while(yPosT != 8)
+            {
+                while(xPosT != 8)
+                {
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                    if(xPosT != 0x7)
+                    {
+                        currentByteRender = tileData >> (28 - ((xPosT) * 4));
+                    }
+                    if(xPosT == 0x7)
+                    {
+                        currentByteRender = tileData;
+                    }
+                    if(swapPal == false && (currentByteRender & 0xF) != 0)
+                    {
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+                    if(swapPal == true && (currentByteRender & 0xF) != 0)
+                    {
+                        uint8_t loopRead = 0;
+                        while (loopRead != 0x10)
+                        {
+                            readablePalRam[0][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[1][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[2][0][loopRead] = loopRead * 0x10;
+                            loopRead++;
+                        }
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+
+                    ++xPosT;
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                }
+                //printf("xP: 0x%X\n",xPosT);
+                xPosT = 0;
+                xPosT2 = xTile * 8;
+                ++yPosT;
+                yPosT2 = (yTile * 8) + yPosT;
+                tileLocate += 4;
+                tileData = readMem(2,tileLocate);
+            }
+            yPosT = 0;
+            yPosT2 = (yTile * 8);
+            ++xTile;
+            xPosT2 = xTile * 8;
+            charData = readMem(1, 0x06000000 + (bg0Screen * 0x800) + (xTile * 2) + (yTile * 0x40));
+            charIndex = charData & 0x1FF;
+            charPal = (charData >> 12) & 0xF;
+            tileLocate = 0x06000000 + (charIndex * 0x20) + (bg0Char * 0x4000);
+            //printf("tileLocate: 0x%X\n",tileLocate);
+        }
+        xPosT = 0;
+        xTile = 0;
+        xPosT2 = xTile * 8;
+        ++yTile;
+        yPosT = 0;
+        yPosT2 = (yTile * 8);
+    }
+    xPosT = 0;
+    yPosT = 0;
+
+    bg0Screen = (gbaREG.bgCNT[1] >> 8) & 0x1F;
+    bg0Char = (gbaREG.bgCNT[1] >> 2) & 0x3;
+    //breakpoint = true;
+    //printf("bg0S: 0x%X\n",bg0Screen);
+    //printf("bg0C: 0x%X\n",bg0Char);
+    charData = readMem(1, 0x06000000 + bg0Screen * 0x800);
+    charIndex = charData & 0x1FF;
+    charPal = (charData >> 12) & 0xF;
+    tileLocate = 0x06000000 + charIndex + (bg0Char * 0x4000);
+    xPosT = 0;
+    yPosT = 0;
+    xPosT2 = 0;
+    yPosT2 = 0;
+    xTile = 0;
+    yTile = 0;
+    tileData = readMem(2,tileLocate);
+    while(yTile != 0x14)
+    {
+        while(xTile != 0x1F)
+        {
+            while(yPosT != 8)
+            {
+                while(xPosT != 8)
+                {
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                    if(xPosT != 0x7)
+                    {
+                        currentByteRender = tileData >> (28 - ((xPosT) * 4));
+                    }
+                    if(xPosT == 0x7)
+                    {
+                        currentByteRender = tileData;
+                    }
+                    if(swapPal == false && (currentByteRender & 0xF) != 0)
+                    {
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+                    if(swapPal == true && (currentByteRender & 0xF) != 0)
+                    {
+                        uint8_t loopRead = 0;
+                        while (loopRead != 0x10)
+                        {
+                            readablePalRam[0][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[1][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[2][0][loopRead] = loopRead * 0x10;
+                            loopRead++;
+                        }
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+
+                    ++xPosT;
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                }
+                //printf("xP: 0x%X\n",xPosT);
+                xPosT = 0;
+                xPosT2 = xTile * 8;
+                ++yPosT;
+                yPosT2 = (yTile * 8) + yPosT;
+                tileLocate += 4;
+                tileData = readMem(2,tileLocate);
+            }
+            yPosT = 0;
+            yPosT2 = (yTile * 8);
+            ++xTile;
+            xPosT2 = xTile * 8;
+            charData = readMem(1, 0x06000000 + (bg0Screen * 0x800) + (xTile * 2) + (yTile * 0x40));
+            charIndex = charData & 0x1FF;
+            charPal = (charData >> 12) & 0xF;
+            tileLocate = 0x06000000 + (charIndex * 0x20) + (bg0Char * 0x4000);
+            //printf("tileLocate: 0x%X\n",tileLocate);
+        }
+        xPosT = 0;
+        xTile = 0;
+        xPosT2 = xTile * 8;
+        ++yTile;
+        yPosT = 0;
+        yPosT2 = (yTile * 8);
+    }
+    xPosT = 0;
+    yPosT = 0;
+
+    bg0Screen = (gbaREG.bgCNT[0] >> 8) & 0x1F;
+    bg0Char = (gbaREG.bgCNT[0] >> 2) & 0x3;
+    //breakpoint = true;
+    //printf("bg0S: 0x%X\n",bg0Screen);
+    //printf("bg0C: 0x%X\n",bg0Char);
+    charData = readMem(1, 0x06000000 + bg0Screen * 0x800);
+    charIndex = charData & 0x1FF;
+    charPal = (charData >> 12) & 0xF;
+    tileLocate = 0x06000000 + charIndex + (bg0Char * 0x4000);
+    xPosT = 0;
+    yPosT = 0;
+    xPosT2 = 0;
+    yPosT2 = 0;
+    xTile = 0;
+    yTile = 0;
+    tileData = readMem(2,tileLocate);
+    while(yTile != 0x14)
+    {
+        while(xTile != 0x1F)
+        {
+            while(yPosT != 8)
+            {
+                while(xPosT != 8)
+                {
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                    if(xPosT != 0x7)
+                    {
+                        currentByteRender = tileData >> (28 - ((xPosT) * 4));
+                    }
+                    if(xPosT == 0x7)
+                    {
+                        currentByteRender = tileData;
+                    }
+                    if(swapPal == false && (currentByteRender & 0xF) != 0)
+                    {
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+                    if(swapPal == true && (currentByteRender & 0xF) != 0)
+                    {
+                        uint8_t loopRead = 0;
+                        while (loopRead != 0x10)
+                        {
+                            readablePalRam[0][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[1][0][loopRead] = loopRead * 0x10;
+                            readablePalRam[2][0][loopRead] = loopRead * 0x10;
+                            loopRead++;
+                        }
+
+                        screenTexture[yPosT2][xPosT2] = 0xFF << 24 |
+                                                readablePalRam[2][charPal][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][charPal][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][charPal][(currentByteRender & 0xF)];
+                    }
+
+                    ++xPosT;
+                    xPosT2 = flipFix[xPosT] + (xTile * 8);
+                }
+                //printf("xP: 0x%X\n",xPosT);
+                xPosT = 0;
+                xPosT2 = xTile * 8;
+                ++yPosT;
+                yPosT2 = (yTile * 8) + yPosT;
+                tileLocate += 4;
+                tileData = readMem(2,tileLocate);
+            }
+            yPosT = 0;
+            yPosT2 = (yTile * 8);
+            ++xTile;
+            xPosT2 = xTile * 8;
+            charData = readMem(1, 0x06000000 + (bg0Screen * 0x800) + (xTile * 2) + (yTile * 0x40));
+            charIndex = charData & 0x1FF;
+            charPal = (charData >> 12) & 0xF;
+            tileLocate = 0x06000000 + (charIndex * 0x20) + (bg0Char * 0x4000);
+            //printf("tileLocate: 0x%X\n",tileLocate);
+        }
+        xPosT = 0;
+        xTile = 0;
+        xPosT2 = xTile * 8;
+        ++yTile;
+        yPosT = 0;
+        yPosT2 = (yTile * 8);
+    }
+    xPosT = 0;
+    yPosT = 0;
+
+    return 0;
+}
+
 void basicTiles1Render()
 {
     uint32_t tileLocate = 0x06000000;
+    if(toggleTileDisplay == true)
+    {
+        tileLocate = 0x06008000;
+    }
     uint32_t tileData;
     xPosT = 0;
     yPosT = 0;
@@ -385,9 +848,9 @@ void basicTiles1Render()
                     if(swapPal == false)
                     {
                         tiles1Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
                     if(swapPal == true)
                     {
@@ -401,9 +864,9 @@ void basicTiles1Render()
                         }
 
                         tiles1Texture[yPosT2][xPosT2] = 0xFF << 24 |
-                                                readablePalRam[2][0][(currentByteRender & 0xF0) >> 4] << 16 |
-                                                readablePalRam[1][0][(currentByteRender & 0xF0) >> 4] << 8 |
-                                                readablePalRam[0][0][(currentByteRender & 0xF0) >> 4];
+                                                readablePalRam[2][0][(currentByteRender & 0xF)] << 16 |
+                                                readablePalRam[1][0][(currentByteRender & 0xF)] << 8 |
+                                                readablePalRam[0][0][(currentByteRender & 0xF)];
                     }
 
                     xPosT++;
@@ -453,7 +916,7 @@ void basicRenderMode1()
             {
                 while(tileCordX != 8)
                 {
-                    screenTexture[yPos + tileCordY][xPos + tileCordX] = 0xFF << 24 | currentByteRender2 << 8 | 0x00;
+                    //screenTexture[yPos + tileCordY][xPos + tileCordX] = 0xFF << 24 | currentByteRender2 << 8 | 0x00;
                     tileCordX += 1;
                 }
                 tileCordX = 0;
@@ -513,7 +976,7 @@ void handleRendering()
         */
 
         case 0:
-            basicMode0Render();
+            basicMode0RenderMSC();
         break;
 
         case 4:
@@ -521,8 +984,15 @@ void handleRendering()
         break;
 
         default:
-            printf("Unimplemented Render Mode 0x%X!\nDefaulting to Mode 4!\n");
-            basicRenderMode4();
+            printf("Unimplemented Render Mode 0x%X!\nDefaulting to Default!\n",currentDispMode);
+            if(currentDispMode < 3)
+            {
+                basicMode0Render();
+            }
+            if(currentDispMode >= 3)
+            {
+                basicRenderMode4();
+            }
         break;
     }
     if(displayDisplayView == true)
@@ -544,7 +1014,7 @@ void handleRendering()
 
     glBindTexture(GL_TEXTURE_2D, screenTexGL);
 
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,240,160,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenTexture);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,240,180,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenTexture);
     glGenerateMipmap(GL_TEXTURE_2D);
     //glBindTexture(GL_TEXTURE_2D, 0);
     handleDebugWindow();
