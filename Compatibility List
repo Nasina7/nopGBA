@@ -27,7 +27,7 @@ Grand Theft Auto             - Waiting for Interrupts in BIOS
 
 Harvest Moon                 - Unimplemented Write ADDR 0xFFFFFFFC
 
-Kirby and the Amazing Mirror - Stuck waiting for Serial Interrupt
+Kirby and the Amazing Mirror - In Menus
 
 Kirby NID (Mode 7)           - In Loop
 
@@ -59,25 +59,27 @@ Super Mario Golf             - Unimplemented MISC Instruction (Has loaded tilema
 
 Sword of Mana                - Waiting for Interrupts in BIOS when none are Enabled
 
-Mario Party Advance          - Stuck in Weird BIOS loop
+Mario Party Advance          - In beginning logos
 
-Mario Pinball Land           - Waiting for Interrupts in BIOS
+Mario Pinball Land           - Opening Cutscene?
 
 Mario VS DK                  - Waiting for Timer 0 Interrupt
 
 Mario Kart Super Circuit     - Waiting for Interrupts
 
-Mother 1 + 2                 - Waiting for Interrupts in BIOS \ Shows Nintendo Logo
+Mother 1 + 2                 - Goes to Select a Game Prompt
+    Mother 1                 - ?
+    Mother 2                 - Plays opening cutscene, then crashes with unknown read address 0x807E80E0
 
-Mother 3                     - Waiting for Interrupts in BIOS
+Mother 3                     - Runs to Character Selection, need to test further
 
-One Piece                    - Waiting for Serial Interrupt
+One Piece                    - Almost in game
 
 Pokemon Emerald              - Stuck in Loop
 
 Pokemon Fire Red             - Stuck in Loop
 
-Pokemon Mystery Dungeon (Red)- Waiting for Interrupts in BIOS
+Pokemon Mystery Dungeon (Red)- Tested as far as cutscene before ingame when you wake up as a pokemon.  need to test further
 
 Pokemon Ruby                 - Stuck in BIOS
 
@@ -85,15 +87,15 @@ Pokemon Sapphire             - Stuck in BIOS
 
 Pokemon Pinball (Intro)      - Jumps to invalid address
 
-Sonic Advance 1              - Waiting for Interrupts in BIOS
+Sonic Advance 1              - Displays an animation and hangs
 
-Sonic Advance 2              - Waiting for Interrupts in BIOS
+Sonic Advance 2              - See Sonic Advance 1
 
-Sonic Advance 3              - Waiting for Interrupts in BIOS
+Sonic Advance 3              - See Sonic Advance 1
 
-Sonic Battle                 - Waiting for Interrupts in BIOS
+Sonic Battle                 - Crash
 
-Sonic Genesis                - Waiting for Interrupts in BIOS
+Sonic Genesis                - In Game, heavy graphical glitches
 
 Sonic Pinball Party  (VENOM) - Does Weird thing with pallete, then inf loop
 
@@ -105,7 +107,7 @@ The Legend of Z: LTTP(Mode 7)- Stuck in loop accessing mirrored ram?
 
 The Legend of Z: LTTP        - Waiting for Interrupts in BIOS
 
-The Legend of Zelda: Minish  - Waiting for Interrupts in BIOS
+The Legend of Zelda: Minish  - Shows Graphics, causing too many breakpoints for me to test.
 
 Wario Land 4                 - Unimplemented Condition 0xF!
 

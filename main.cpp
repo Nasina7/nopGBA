@@ -22,6 +22,8 @@ int main()
     gbaREG.spsr = 0x10;
     //loadROM();
     //printf("test\n");
+    //internalFPSBenchmark();
+    doInternalFramerate();
     while(closenopGBA == false)
     {
         while(allowRun == false)
@@ -29,10 +31,10 @@ int main()
             handleMainGUI();
             handleSDLcontrol();
         }
-        testPrev = gbaREG.rNUM[13];
-        gbaREG.prevCpsr = gbaREG.cpsr.to_ulong();
         if(gbaREG.currentlyHalted == false)
         {
+            testPrev = gbaREG.rNUM[13];
+            gbaREG.prevCpsr = gbaREG.cpsr.to_ulong();
             doOpcodeMain();
             test15 = gbaREG.rNUM[15];
             if(gbaREG.cpsr[5] == 0)
@@ -55,9 +57,38 @@ int main()
         }
         //gbaRAM.onChipWRAM[0x1EC4] = 0x00;
         opcodesRan++;
-        handleDMA();
-        checkModeSwitch();
-        handleBreakpoint();
+        if(gbaREG.currentlyHalted == false)
+        {
+            handleDMA();
+            checkModeSwitch();
+            handleBreakpoint();
+            if(breakpoint == true)
+            {
+                printRegs();
+                allowRun = false;
+                while(allowRun == false)
+                {
+                    handleMainGUI();
+                    handleSDLcontrol();
+                }
+            }
+            if(opcodeError == true)
+            {
+
+                allowRun = false;
+                dontDisplayError = false;
+
+                printf("LAST THUMB In Binary: ");
+                std::cout<<op16bit<<std::endl;
+                printf("LAST ARM In Binary: ");
+                op32bit = currentOpcode;
+                std::cout<<op32bit<<std::endl;
+                printf("lcdControl: 0x%X\n",gbaREG.lcdControl);
+                memDump();
+                printRegs();
+                printf("Opcodes Ran: %i\n",opcodesRan);
+            }
+        }
         //printf("R15: 0x%X\n",gbaREG.rNUM[15]);
         //breakpoint = true;
         if(opcodesRan % opcodesPerFrame == 0)
@@ -68,56 +99,6 @@ int main()
             handleRendering();
             handleSDLcontrol();
         }
-        //std::cout<<"CPSR: "<<gbaREG.cpsr<<std::endl;
-        if(breakpoint == true)
-        {
-            printRegs();
-            allowRun = false;
-            while(allowRun == false)
-            {
-                handleMainGUI();
-                handleSDLcontrol();
-            }
-            //printf("Opcode Thumb: 0x%X\n",currentThumbOpcode);
-            //printRegs();
-            //printDMARegs();
-            //printf("Opcodes Ran: %i\n",opcodesRan);
-            //printf("Would you like to continue?\n");
-            //cin>>option;
-            //memDump();
-            //if(option == 'n')
-            //{
-            //    breakpoint = false;
-            //}
-        }
-        //printRegs();
-        //printf("PC: 0x%X\n",gbaREG.rNUM[15]);
-        if(opcodeError == true)
-        {
-
-            allowRun = false;
-            dontDisplayError = false;
-
-            printf("LAST THUMB In Binary: ");
-            std::cout<<op16bit<<std::endl;
-            printf("LAST ARM In Binary: ");
-            op32bit = currentOpcode;
-            std::cout<<op32bit<<std::endl;
-            printf("lcdControl: 0x%X\n",gbaREG.lcdControl);
-            memDump();
-            printRegs();
-            //printDMARegs();
-            printf("Opcodes Ran: %i\n",opcodesRan);
-            //ImGui_ImplOpenGL3_Shutdown();
-            //ImGui_ImplSDL2_Shutdown();
-            //ImGui::DestroyContext();
-
-            //SDL_GL_DeleteContext(gl_context);
-            //SDL_DestroyWindow(debugScreen);
-            //SDL_Quit();
-            //return 1;
-        }
-
     }
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();

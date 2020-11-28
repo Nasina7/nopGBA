@@ -60,7 +60,113 @@ uint8_t dmaWriteMode;
 uint8_t addrControl;
 void doDMATransfer()
 {
+
+
+
     dmaWriteMode = dmaControl[10] + 1;
+    printf("dmaWRITEMODE: 0x%X\n",dmaWriteMode);
+
+
+    switch(dmaWriteMode)
+    {
+        case 0x1:  // 16-bit
+            while(wordCountDMA != 0)
+            {
+                writeMem(1,endAddrDMA,readMem(1,startAddrDMA));
+                wordCountDMA--;
+                addrControl = dmaControl[6] << 1 | dmaControl[5];
+                switch(addrControl)
+                {
+                    case 0:
+                        endAddrDMA += 2;
+                    break;
+
+                    case 1:
+                        endAddrDMA -= 2;
+                    break;
+
+                    case 2:
+                        // Don't change end address
+                    break;
+
+                    default:
+                        printf("DMA WARNING 3!\n");
+                    break;
+                }
+                addrControl = dmaControl[8] << 1 | dmaControl[7];
+                switch(addrControl)
+                {
+                    case 0:
+                        startAddrDMA += 2;
+                    break;
+
+                    case 1:
+                        startAddrDMA -= 2;
+                    break;
+
+                    case 2:
+                        // Don't change end address
+                    break;
+
+                    default:
+                        printf("DMA WARNING 3!\n");
+                    break;
+                }
+            }
+        break;
+
+        case 0x2: // 32-bit
+            while(wordCountDMA != 0)
+            {
+                writeMem(2,endAddrDMA,readMem(2,startAddrDMA));
+                wordCountDMA--;
+                addrControl = dmaControl[6] << 1 | dmaControl[5];
+                switch(addrControl)
+                {
+                    case 0:
+                        endAddrDMA += 4;
+                    break;
+
+                    case 1:
+                        endAddrDMA -= 4;
+                    break;
+
+                    case 2:
+                        // Don't change end address
+                    break;
+
+                    default:
+                        printf("DMA WARNING 3!\n");
+                    break;
+                }
+                addrControl = dmaControl[8] << 1 | dmaControl[7];
+                switch(addrControl)
+                {
+                    case 0:
+                        startAddrDMA += 4;
+                    break;
+
+                    case 1:
+                        startAddrDMA -= 4;
+                    break;
+
+                    case 2:
+                        // Don't change end address
+                    break;
+
+                    default:
+                        printf("DMA WARNING 3!\n");
+                    break;
+                }
+            }
+        break;
+
+        default:
+            printf("this should not happen.  DMA ERROR!\n");
+        break;
+    }
+
+    /*
     while(wordCountDMA != 0)
     {
         writeMem(dmaWriteMode,endAddrDMA,readMem(dmaWriteMode,startAddrDMA));
@@ -104,6 +210,7 @@ void doDMATransfer()
             break;
         }
     }
+    */
     printf("DMA FINISH!\n");
 }
 uint8_t currentMode;
@@ -253,6 +360,7 @@ void handleDMA()
         if(gbaREG.dmaControl0[13] == 0 && gbaREG.dmaControl0[12] == 0 && wordCountDMA != 0)
         {
             // Immediately
+            printf("DMA 0 WAS ENABLED!\n");
             doDMATransfer();
             gbaREG.dmaControl0[15] = 0;
         }
@@ -276,6 +384,7 @@ void handleDMA()
         if(gbaREG.dmaControl2[13] == 0 && gbaREG.dmaControl2[12] == 0 && wordCountDMA != 0)
         {
             // Immediately
+            printf("DMA 2 WAS ENABLED!\n");
             doDMATransfer();
             gbaREG.dmaControl2[15] = 0;
         }
@@ -296,6 +405,10 @@ void handleDMA()
         if(gbaREG.dmaControl3[13] == 0 && gbaREG.dmaControl3[12] == 0 && wordCountDMA != 0)
         {
             // Immediately
+            printf("DMA3Start: 0x%X\n", startAddrDMA);
+            printf("EndAddrDMA: 0x%X\n", endAddrDMA);
+            printf("wordCountDMA: 0x%X\n", wordCountDMA);
+            //printf("DMA 3 WAS ENABLED!\n");
             doDMATransfer();
             gbaREG.dmaControl3[15] = 0;
         }
@@ -2124,7 +2237,7 @@ void opOR()
                 opRDET = currentOpcode >> 8;
                 opRS = opRDET.to_ulong();
                 immed8VAL = gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF);
-                shiftOut = (gbaREG.rNUM[opRM] << (gbaREG.rNUM[opRS] & 0x000000FF) - 1) & 0x80000000;
+                shiftOut = (gbaREG.rNUM[opRM] << ((gbaREG.rNUM[opRS] & 0x000000FF) - 1)) & 0x80000000;
             break;
 
             case 2:
@@ -4574,7 +4687,7 @@ bool endWhile;
 uint8_t IEfix;
 void handleInterrupts()
 {
-    if(opcodesRan % 2500000 == 0 && opcodesRan != 0)
+    if(opcodesRan % 500000 == 0 && opcodesRan != 0)
     {
         gbaREG.IF = gbaREG.IF | 0x1;
     }
@@ -4600,6 +4713,7 @@ void handleInterrupts()
         endWhileIE:
         if(endWhile == true && gbaREG.IME == true && gbaREG.cpsr[7] == 0)
         {
+            checkInternalFrames++;
             printf("Doing Hardware Interrupt 0x%X!\n",IEcount);
             //gbaREG.R1314_irq[1] = gbaREG.rNUM[15] + 4;
             gbaREG.R1314_irq[1] = gbaREG.rNUM[15] + 4;

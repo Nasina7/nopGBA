@@ -1,15 +1,17 @@
 # depslib dependency file v1.0
-1606025073 source:/home/zach/codeblocks/nopGBA/main.cpp
+1606601113 source:/home/zach/codeblocks/nopGBA/main.cpp
 	"cpu.hpp"
 
-1606019468 /home/zach/codeblocks/nopGBA/cpu.hpp
+1606599785 /home/zach/codeblocks/nopGBA/cpu.hpp
 	"cpuTHUMB.hpp"
 
-1606027191 /home/zach/codeblocks/nopGBA/include.hpp
+1606600560 /home/zach/codeblocks/nopGBA/include.hpp
 	<iostream>
 	<bitset>
 	<SDL2/SDL.h>
 	<bits/stdc++.h>
+	<thread>
+	<unistd.h>
 	<GL/glew.h>
 	"imgui.h"
 	"ImGuiFileDialog.h"
@@ -17,10 +19,10 @@
 	"imgui_impl_opengl3.h"
 	"imgui_impl_sdl.h"
 
-1606020884 /home/zach/codeblocks/nopGBA/cpuTHUMB.hpp
+1606105423 /home/zach/codeblocks/nopGBA/cpuTHUMB.hpp
 	"rendering.hpp"
 
-1606026914 /home/zach/codeblocks/nopGBA/rendering.hpp
+1606601477 /home/zach/codeblocks/nopGBA/rendering.hpp
 	"input.hpp"
 
 1596637631 /home/zach/codeblocks/nopGBA/input.hpp
@@ -186,4 +188,10 @@
 1596563694 /home/zach/codeblocks/nopGBA/imgui_memory_editor.h
 	<stdio.h>
 	<stdint.h>
+
+1604943823 /home/zach/codeblocks/nopGBA/nbit.hpp
+
+1604943823 source:/home/zach/codeblocks/nopGBA/nbit.cpp
+	"nbit.hpp"
+	<stdio.h>
 

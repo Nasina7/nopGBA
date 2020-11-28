@@ -2,6 +2,8 @@
 #include <bitset>
 #include <SDL2/SDL.h>
 #include <bits/stdc++.h>
+#include <thread>
+#include <unistd.h>
 
 #include <GL/glew.h>
 #include "imgui.h"
@@ -34,8 +36,8 @@ class nGBARAM
         uint8_t SaveRAM[0x10000];
         // 0E010000 - FFFFFFFF UNUSED
 };
-uint8_t readablePalRam[3][0x20][0x10];  // RGB COLOR, ROW, COLLUM
 uint8_t readablePalRam2[3][0x10];  // RGB COLOR, ROW, COLLUM
+uint8_t readablePalRam[3][0x20][0x10];  // RGB COLOR, ROW, COLLUM
 bool updateReadPal;
 class nGBACPU
 {
@@ -64,8 +66,10 @@ class nGBACPU
         bool currentlyHalted;
         uint16_t IE;
         uint16_t IF;
-        uint32_t bgCNT[4];
-        uint32_t soundBias;
+        uint16_t bgCNT[4];
+        uint16_t bgXScroll[4];
+        uint16_t bgYScroll[4];
+        uint16_t soundBias;
 };
 bool shiftOut;
 bool breakpoint;
@@ -533,7 +537,7 @@ uint32_t readMem(int readMode, int location)
             break;
 
             default:
-                printf("IO REG NOT IMPLEMENTED YET! READ 0x%X\n!",location);
+                //printf("IO REG NOT IMPLEMENTED YET! READ 0x%X\n!",location);
                 //breakpoint = true;
                 return 0;
             break;
@@ -881,6 +885,94 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
                     gbaREG.bgCNT[3] = value;
                 break;
 
+                case 0x04000010:
+                    if(writeMode != 2)
+                    {
+                        gbaREG.bgXScroll[0] = value;
+                    }
+                    if(writeMode == 2)
+                    {
+                        gbaREG.bgXScroll[0] = value;
+                        gbaREG.bgYScroll[0] = value >> 16;
+                    }
+                break;
+
+                case 0x04000012:
+                    if(writeMode != 2)
+                    {
+                        gbaREG.bgYScroll[0] = value;
+                    }
+                    if(writeMode == 2)
+                    {
+                        gbaREG.bgYScroll[0] = value;
+                        gbaREG.bgXScroll[1] = value >> 16;
+                    }
+                break;
+
+                case 0x04000014:
+                    if(writeMode != 2)
+                    {
+                        gbaREG.bgXScroll[1] = value;
+                    }
+                    if(writeMode == 2)
+                    {
+                        gbaREG.bgXScroll[1] = value;
+                        gbaREG.bgYScroll[1] = value >> 16;
+                    }
+                break;
+
+                case 0x04000016:
+                    if(writeMode != 2)
+                    {
+                        gbaREG.bgYScroll[1] = value;
+                    }
+                    if(writeMode == 2)
+                    {
+                        gbaREG.bgYScroll[1] = value;
+                        gbaREG.bgXScroll[2] = value >> 16;
+                    }
+                break;
+
+                case 0x04000018:
+                    if(writeMode != 2)
+                    {
+                        gbaREG.bgXScroll[2] = value;
+                    }
+                    if(writeMode == 2)
+                    {
+                        gbaREG.bgXScroll[2] = value;
+                        gbaREG.bgYScroll[2] = value >> 16;
+                    }
+                break;
+
+                case 0x0400001A:
+                    if(writeMode != 2)
+                    {
+                        gbaREG.bgYScroll[2] = value;
+                    }
+                    if(writeMode == 2)
+                    {
+                        gbaREG.bgYScroll[2] = value;
+                        gbaREG.bgXScroll[3] = value >> 16;
+                    }
+                break;
+
+                case 0x0400001C:
+                    if(writeMode != 2)
+                    {
+                        gbaREG.bgXScroll[3] = value;
+                    }
+                    if(writeMode == 2)
+                    {
+                        gbaREG.bgXScroll[3] = value;
+                        gbaREG.bgYScroll[3] = value >> 16;
+                    }
+                break;
+
+                case 0x0400001E:
+                    gbaREG.bgYScroll[3] = value;
+                break;
+
                 case 0x04000088:
                     gbaREG.soundBias = value;
                 break;
@@ -986,7 +1078,7 @@ int writeMem(uint8_t writeMode, uint32_t location, uint32_t value)
                 break;
 
                 default:
-                    printf("Unimplemented IO reg 0x%X Written to!  Value was 0x%X!\n",location,value);
+                    //printf("Unimplemented IO reg 0x%X Written to!  Value was 0x%X!\n",location,value);
                 break;
             }
         break;
@@ -1284,6 +1376,7 @@ const char* romName;
 int romSize;
 static MemoryEditor mem_edit_bios;
 
+bool displayBGRegs;
 bool toggleTileDisplay;
 bool displayRAMView;
 bool displayREGView;
@@ -1307,7 +1400,9 @@ bool displayBG0;
 bool displayBG1;
 bool displayBG2;
 bool displayBG3;
-uint32_t opcodesPerFrame = 1000000;
+
+bool increaseScreenSize;
+uint32_t opcodesPerFrame = 500000;
 
 
 bool sFlag;
@@ -1330,6 +1425,8 @@ bool previousCPUMode;
 uint32_t spsr1;
 uint32_t spsr2;
 uint32_t spsr3;
+
+uint32_t bgTex[5][520][512];
 void handleDebugWindow()
 {
     ImGui_ImplOpenGL3_NewFrame();
@@ -1337,16 +1434,26 @@ void handleDebugWindow()
     ImGui::NewFrame();
 
     ImGui::Begin("Screen");
-    ImGui::Image((void*)(intptr_t)screenTexGL,ImVec2(240,180));
+    switch(increaseScreenSize)
+    {
+        case false:
+            ImGui::Image((void*)(intptr_t)screenTexGL,ImVec2(240,180));
+        break;
+
+        case true:
+            ImGui::Image((void*)(intptr_t)screenTexGL,ImVec2(480,360));
+        break;
+    }
+
     ImGui::End();
 
     if(displayBG0 == true)
     {
         glBindTexture(GL_TEXTURE_2D, BG0TexGL);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG0Texture);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,512,520,0,GL_RGBA,GL_UNSIGNED_BYTE,*bgTex[0]);
         glGenerateMipmap(GL_TEXTURE_2D);
         ImGui::Begin("BG0");
-        ImGui::Image((void*)(intptr_t)BG0TexGL,ImVec2(248,248));
+        ImGui::Image((void*)(intptr_t)BG0TexGL,ImVec2(512,520));
         ImGui::End();
 
     }
@@ -1354,30 +1461,30 @@ void handleDebugWindow()
     if(displayBG1 == true)
     {
         glBindTexture(GL_TEXTURE_2D, BG1TexGL);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG1Texture);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,512,520,0,GL_RGBA,GL_UNSIGNED_BYTE,*bgTex[1]);
         glGenerateMipmap(GL_TEXTURE_2D);
         ImGui::Begin("BG1");
-        ImGui::Image((void*)(intptr_t)BG1TexGL,ImVec2(248,248));
+        ImGui::Image((void*)(intptr_t)BG1TexGL,ImVec2(512,520));
         ImGui::End();
     }
 
     if(displayBG2 == true)
     {
         glBindTexture(GL_TEXTURE_2D, BG2TexGL);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG2Texture);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,512,520,0,GL_RGBA,GL_UNSIGNED_BYTE,*bgTex[2]);
         glGenerateMipmap(GL_TEXTURE_2D);
         ImGui::Begin("BG2");
-        ImGui::Image((void*)(intptr_t)BG2TexGL,ImVec2(248,248));
+        ImGui::Image((void*)(intptr_t)BG2TexGL,ImVec2(512,520));
         ImGui::End();
     }
 
     if(displayBG3 == true)
     {
         glBindTexture(GL_TEXTURE_2D, BG3TexGL);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,248,248,0,GL_RGBA,GL_UNSIGNED_BYTE,*screenBG3Texture);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,512,520,0,GL_RGBA,GL_UNSIGNED_BYTE,*bgTex[3]);
         glGenerateMipmap(GL_TEXTURE_2D);
         ImGui::Begin("BG3");
-        ImGui::Image((void*)(intptr_t)BG3TexGL,ImVec2(248,248));
+        ImGui::Image((void*)(intptr_t)BG3TexGL,ImVec2(512,520));
         ImGui::End();
     }
 
@@ -1455,6 +1562,7 @@ void handleDebugWindow()
     if(displayDisplayView2 == true)
     {
         ImGui::Begin("Display Options");
+        ImGui::Checkbox("Screen Size 2x", &increaseScreenSize);
         ImGui::Checkbox("Display Pallete Viewer",&displayDisplayView);
         ImGui::Checkbox("Display Tiles 1 Viewer",&displayTiles1);
         ImGui::Checkbox("Display Background 0 Viewer",&displayBG0);
@@ -1462,7 +1570,7 @@ void handleDebugWindow()
         ImGui::Checkbox("Display Background 2 Viewer",&displayBG2);
         ImGui::Checkbox("Display Background 3 Viewer",&displayBG3);
         ImGui::InputScalar("Opcodes Per Frame:", ImGuiDataType_U32, &opcodesPerFrame, NULL, NULL, "%i", ImGuiInputTextFlags_CharsDecimal);
-        ImGui::InputScalar("BG0:", ImGuiDataType_U32, &gbaREG.bgCNT[0], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::Checkbox("Display Background Registers",&displayBGRegs);
         ImGui::End();
         if(displayDisplayView == true)
         {
@@ -1476,6 +1584,23 @@ void handleDebugWindow()
             ImGui::Checkbox("Swap to Default Pallete",&swapPal);
             ImGui::Checkbox("Toggle Tile Display",&toggleTileDisplay);
             ImGui::Image((void*)(intptr_t)tiles1TexGL,ImVec2(0x3E0,0x3E0));
+            ImGui::End();
+        }
+        if(displayBGRegs == true)
+        {
+            ImGui::Begin("BG Regs");
+            ImGui::InputScalar("BG0:", ImGuiDataType_U16, &gbaREG.bgCNT[0], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG1:", ImGuiDataType_U16, &gbaREG.bgCNT[1], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG2:", ImGuiDataType_U16, &gbaREG.bgCNT[2], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG3:", ImGuiDataType_U16, &gbaREG.bgCNT[3], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG0 X-Scroll:", ImGuiDataType_U16, &gbaREG.bgXScroll[0], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG1 X-Scroll:", ImGuiDataType_U16, &gbaREG.bgXScroll[1], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG2 X-Scroll:", ImGuiDataType_U16, &gbaREG.bgXScroll[2], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG3 X-Scroll:", ImGuiDataType_U16, &gbaREG.bgXScroll[3], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG0 Y-Scroll:", ImGuiDataType_U16, &gbaREG.bgYScroll[0], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG1 Y-Scroll:", ImGuiDataType_U16, &gbaREG.bgYScroll[1], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG2 Y-Scroll:", ImGuiDataType_U16, &gbaREG.bgYScroll[2], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
+            ImGui::InputScalar("BG3 Y-Scroll:", ImGuiDataType_U16, &gbaREG.bgYScroll[3], NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal);
             ImGui::End();
         }
     }
@@ -1714,7 +1839,7 @@ void updateReadPalF()
     uint32_t palReadLocate;
     pRow = 0;
     pCol = 0;
-    while (pRow != 0x10)
+    while (pRow != 0x1F)
     {
         while(pCol != 0x10)
         {
@@ -1732,4 +1857,23 @@ int handleMainGUI()
 {
     handleDebugWindow();
     return 0;
+}
+uint64_t checkInternalFrames;
+uint64_t beginIntFPS;
+uint64_t endIntFPS;
+char windowTitle[100];
+void internalFramerateThread()
+{
+    beginIntFPS = checkInternalFrames;
+    sleep(1);
+    endIntFPS = checkInternalFrames;
+    endIntFPS = endIntFPS - beginIntFPS;
+    sprintf(windowTitle, "nopGBA | Internal FPS: %i", endIntFPS);
+    SDL_SetWindowTitle(debugScreen, windowTitle);
+    internalFramerateThread();
+}
+void doInternalFramerate()
+{
+    std::thread internalFPS(internalFramerateThread);
+    internalFPS.detach();
 }
